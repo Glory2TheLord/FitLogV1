@@ -1,5 +1,6 @@
 import FitLogHeader from '@/components/FitLogHeader';
 import { usePhotoDays } from '@/contexts/PhotoDayContext';
+import { PhotoPositionId } from '@/models/photos';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
@@ -58,10 +59,18 @@ export default function PhotoDetailScreen() {
   const [newPoseName, setNewPoseName] = useState('');
 
   const photoDay = photoDays.find(day => day.dateKey === dateKey);
+  const DEFAULT_KEYS = DEFAULT_POSES.map(p => p.key);
 
   // Load existing photos from photoDay
   useEffect(() => {
     if (photoDay) {
+      // Normalize to ensure all default poses exist
+      const missing = DEFAULT_POSES.filter(p => !photoDay.positions.find(pos => pos.id === p.key));
+      if (missing.length > 0) {
+        const updated = { ...photoDay, positions: [...photoDay.positions, ...missing.map(m => ({ id: m.key as PhotoPositionId, label: m.label }))] };
+        updatePhotoDay(photoDay.dateKey, updated);
+      }
+
       const loadedPhotos: Record<PoseKey, string | null> = {};
       photoDay.positions.forEach(pos => {
         if (pos.imageUri) {
@@ -273,7 +282,7 @@ export default function PhotoDetailScreen() {
       <View style={styles.pageTitleRow}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => router.replace('/(tabs)/photos')}
         >
           <Feather name="arrow-left" size={20} color="#000" />
         </TouchableOpacity>

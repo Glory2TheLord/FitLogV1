@@ -9,6 +9,8 @@ export type Preferences = {
   dailyCalorieGoal: number; // kcal
   dailyProteinGoal: number; // grams
   cheatMealIntervalDays: number;
+  daysUntilWeighInInterval: number;
+  daysUntilProgressPhotosInterval: number;
 };
 
 type PreferencesContextValue = {
@@ -26,6 +28,8 @@ const DEFAULT_PREFERENCES: Preferences = {
   dailyCalorieGoal: 1600,
   dailyProteinGoal: 165,
   cheatMealIntervalDays: 7,
+  daysUntilWeighInInterval: 7,
+  daysUntilProgressPhotosInterval: 14,
 };
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {

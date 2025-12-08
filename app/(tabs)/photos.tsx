@@ -1,5 +1,6 @@
 import FitLogHeader from '@/components/FitLogHeader';
 import { usePhotoDays } from '@/contexts/PhotoDayContext';
+import { usePreferences } from '@/contexts/PreferencesContext';
 import { PhotoDay } from '@/models/photos';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -8,10 +9,12 @@ import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ACCENT = '#FF5A2C';
+const REQUIRED_POSE_IDS = ['front', 'left', 'right', 'back', 'flex'] as const;
 
 export default function PhotosScreen() {
   const router = useRouter();
-  const { photoDays, addPhotoDay, removePhotoDay } = usePhotoDays();
+  const { photoDays, addPhotoDay, removePhotoDay, getNextProgressPhotoInfo } = usePhotoDays();
+  const { preferences } = usePreferences();
 
   const handleAddCheckIn = () => {
     const today = new Date();
@@ -39,7 +42,8 @@ export default function PhotosScreen() {
       displayDate,
       positions: [
         { id: 'front', label: 'Front' },
-        { id: 'side', label: 'Side' },
+        { id: 'left', label: 'Left' },
+        { id: 'right', label: 'Right' },
         { id: 'back', label: 'Back' },
         { id: 'flex', label: 'Flex' },
       ],
@@ -74,6 +78,22 @@ export default function PhotosScreen() {
     );
   };
   
+  const { nextDate, daysUntil } = getNextProgressPhotoInfo(preferences.daysUntilProgressPhotosInterval);
+  const formatDateShort = (date: Date) =>
+    date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  let nextPhotoText = 'Next progress photo check-in: not scheduled yet';
+  if (nextDate && typeof daysUntil === 'number') {
+    const formatted = formatDateShort(nextDate);
+    if (daysUntil === 0) {
+      nextPhotoText = `Next progress photo check-in: today (${formatted})`;
+    } else if (daysUntil === 1) {
+      nextPhotoText = `Next progress photo check-in: in 1 day (${formatted})`;
+    } else {
+      nextPhotoText = `Next progress photo check-in: in ${daysUntil} days (${formatted})`;
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <FitLogHeader onSettingsPress={() => router.push('/settings')} />
@@ -82,6 +102,7 @@ export default function PhotosScreen() {
         <View style={styles.pageTitleRow}>
           <Text style={styles.pageTitle}>Photos</Text>
         </View>
+        <Text style={styles.nextCheckInText}>{nextPhotoText}</Text>
         <View style={styles.header}>
           <View>
             <Text style={styles.subtitle}>Long-term progress check-ins</Text>
@@ -112,8 +133,10 @@ export default function PhotosScreen() {
             <View style={styles.grid}>
               {photoDays.map(photoDay => {
               const firstPhoto = getFirstPhotoUri(photoDay);
-              const completed = photoDay.positions.filter(p => p.imageUri).length;
-              const total = photoDay.positions.length;
+              const completed = REQUIRED_POSE_IDS.filter(id =>
+                photoDay.positions.find(p => p.id === id && p.imageUri)
+              ).length;
+              const total = REQUIRED_POSE_IDS.length;
 
               return (
                 <View key={photoDay.dateKey} style={styles.folderCard}>
@@ -293,5 +316,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#999999',
     textAlign: 'center',
+  },
+  nextCheckInText: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 8,
   },
 });

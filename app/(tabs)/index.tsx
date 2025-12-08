@@ -5,6 +5,7 @@ import { useUserProfile } from '@/contexts/UserProfileContext';
 import { useDayMetrics } from '@/contexts/DayMetricsContext';
 import { usePreferences } from '@/contexts/PreferencesContext';
 import { useWorkouts } from '@/contexts/WorkoutsContext';
+import { usePhotoDays } from '@/contexts/PhotoDayContext';
 import {
     Feather,
     FontAwesome5,
@@ -55,6 +56,7 @@ export default function HomeScreen() {
     cheatUsedToday
   } = useMealTracking();
   const { preferences } = usePreferences();
+  const { photoDays } = usePhotoDays();
   
   // Get workouts context
   const {
@@ -76,6 +78,10 @@ export default function HomeScreen() {
   const tomorrowDate = new Date(today);
   tomorrowDate.setDate(today.getDate() + 1);
   const isTomorrowSunday = tomorrowDate.getDay() === 0; // 0 = Sunday
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  const todayDateKey = `${year}-${month}-${day}`;
 
   // ===== STEP TRACKER STATE =====
   const [isPedometerAvailable, setIsPedometerAvailable] = useState<
@@ -95,6 +101,33 @@ export default function HomeScreen() {
   // Calculate days to cheat meal using preference interval and eating streak
   const daysToCheatMeal = Math.max(0, preferences.cheatMealIntervalDays - goodEatingStreak);
 
+  // Weigh-in requirement/completion
+  const hasWeighedInToday = (profile.weighIns || []).some(w => w.date.slice(0, 10) === todayDateKey);
+  const lastWeighInDate = (() => {
+    const weighIns = profile.weighIns || [];
+    if (weighIns.length === 0) return null;
+    const sorted = [...weighIns].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return sorted[0].date;
+  })();
+  const daysSinceLastWeighIn = lastWeighInDate
+    ? Math.floor((today.getTime() - new Date(lastWeighInDate).getTime()) / (1000 * 60 * 60 * 24))
+    : Infinity;
+  const isWeighInRequiredToday = daysSinceLastWeighIn >= preferences.daysUntilWeighInInterval || !lastWeighInDate;
+
+  // Photos requirement/completion
+  const todayPhotoDay = photoDays.find(day => day.dateKey === todayDateKey);
+  const photosRequiredPerDay = 4; // front, side, back, flex
+  const hasCompletedPhotosToday = !!(todayPhotoDay && todayPhotoDay.positions.filter(p => p.imageUri).length >= photosRequiredPerDay);
+  const lastPhotoDate = (() => {
+    if (photoDays.length === 0) return null;
+    const sorted = [...photoDays].sort((a, b) => new Date(b.dateKey).getTime() - new Date(a.dateKey).getTime());
+    return sorted[0].dateKey;
+  })();
+  const daysSinceLastPhotoDay = lastPhotoDate
+    ? Math.floor((today.getTime() - new Date(lastPhotoDate).getTime()) / (1000 * 60 * 60 * 24))
+    : Infinity;
+  const isProgressPhotosRequiredToday = daysSinceLastPhotoDay >= preferences.daysUntilProgressPhotosInterval || !lastPhotoDate;
+
   // ===== STATUS COMPLETE STATES FOR MARK DAY ICONS =====
   // Steps complete: meets goal
   const stepsComplete = hasMetStepGoal;
@@ -107,12 +140,6 @@ export default function HomeScreen() {
     return meetsCalories && meetsProtein && allSelectedSlotsCompleted && !cheatUsedToday;
   })();
 
-  // Compute today's date key for workouts
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  const todayDateKey = `${year}-${month}-${day}`;
-  
   // Workouts complete: all workouts for today are marked complete
   const workoutsComplete = hasCompletedWorkoutsForDate(todayDateKey);
 
@@ -194,10 +221,15 @@ export default function HomeScreen() {
   // ===== GATE: CAN MARK DAY COMPLETE =====
   const atLeastOneWorkoutCompleted = getWorkoutsForDate(todayDateKey).some(w => w.isCompleted);
 
+  const meetsWeighInRequirement = !isWeighInRequiredToday || hasWeighedInToday;
+  const meetsPhotoRequirement = !isProgressPhotosRequiredToday || hasCompletedPhotosToday;
+
   const canMarkDayComplete =
     stepsComplete &&
     mealsComplete &&
     atLeastOneWorkoutCompleted &&
+    meetsWeighInRequirement &&
+    meetsPhotoRequirement &&
     (!photosDueToday || photosComplete) &&
     (!weighInDueToday || weighInComplete);
 
@@ -655,11 +687,11 @@ export default function HomeScreen() {
                 />
                 
                 {/* Photos - only show when due */}
-                {photosDueToday && (
+                {isProgressPhotosRequiredToday && (
                   <Feather
                     name="camera"
                     size={16}
-                    color={photosComplete ? '#16a34a' : '#d1d5db'}
+                    color={hasCompletedPhotosToday ? '#16a34a' : '#d1d5db'}
                     style={styles.statusIcon}
                   />
                 )}
@@ -671,13 +703,13 @@ export default function HomeScreen() {
                   color={atLeastOneWorkoutCompleted ? '#16a34a' : '#d1d5db'}
                   style={styles.statusIcon}
                 />
-                
+
                 {/* Weigh-in - only show when due */}
-                {weighInDueToday && (
+                {isWeighInRequiredToday && (
                   <MaterialCommunityIcons
                     name="scale-bathroom"
                     size={18}
-                    color={weighInComplete ? '#16a34a' : '#d1d5db'}
+                    color={hasWeighedInToday ? '#16a34a' : '#d1d5db'}
                     style={styles.statusIcon}
                   />
                 )}

@@ -1,4 +1,4 @@
-export type PhotoPositionId = 'front' | 'side' | 'back' | 'flex';
+export type PhotoPositionId = 'front' | 'left' | 'right' | 'back' | 'flex';
 
 export type PhotoPosition = {
   id: PhotoPositionId;

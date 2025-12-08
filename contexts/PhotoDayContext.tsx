@@ -1,4 +1,4 @@
-import { PhotoDay } from '@/models/photos';
+import { PhotoDay, PhotoPosition } from '@/models/photos';
 import { getUserScopedKey } from '@/storage/userScopedKey';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
@@ -6,12 +6,27 @@ import { useUser } from './UserContext';
 
 const BASE_STORAGE_KEY_PHOTO_DAYS = 'fitlog_photo_days_v1';
 
+const DEFAULT_POSITIONS: PhotoPosition[] = [
+  { id: 'front', label: 'Front' },
+  { id: 'left', label: 'Left' },
+  { id: 'right', label: 'Right' },
+  { id: 'back', label: 'Back' },
+  { id: 'flex', label: 'Flex' },
+];
+
+function normalizePhotoDay(day: PhotoDay): PhotoDay {
+  const existingIds = day.positions.map(p => p.id);
+  const missing = DEFAULT_POSITIONS.filter(p => !existingIds.includes(p.id));
+  return missing.length > 0 ? { ...day, positions: [...day.positions, ...missing] } : day;
+}
+
 type PhotoDayContextType = {
   photoDays: PhotoDay[];
   setPhotoDays: (days: PhotoDay[]) => void;
   addPhotoDay: (day: PhotoDay) => void;
   updatePhotoDay: (dateKey: string, updatedDay: PhotoDay) => void;
   removePhotoDay: (dateKey: string) => void;
+  getNextProgressPhotoInfo: (intervalDays: number) => { nextDate: Date | null; daysUntil: number | null };
 };
 
 const PhotoDayContext = createContext<PhotoDayContextType | undefined>(undefined);
@@ -42,7 +57,9 @@ export function PhotoDayProvider({ children }: { children: ReactNode }) {
         if (isCancelled) return;
 
         if (stored) {
-          setPhotoDays(JSON.parse(stored));
+          const parsed = JSON.parse(stored);
+          const normalized = parsed.map((d: PhotoDay) => normalizePhotoDay(d));
+          setPhotoDays(normalized);
         } else {
           setPhotoDays([]);
         }
@@ -82,7 +99,7 @@ export function PhotoDayProvider({ children }: { children: ReactNode }) {
   }, [photoDays, isLoaded, userId]);
 
   const addPhotoDay = (day: PhotoDay) => {
-    setPhotoDays(prev => [day, ...prev]);
+    setPhotoDays(prev => [normalizePhotoDay(day), ...prev]);
   };
 
   const updatePhotoDay = (dateKey: string, updatedDay: PhotoDay) => {
@@ -95,8 +112,33 @@ export function PhotoDayProvider({ children }: { children: ReactNode }) {
     setPhotoDays(prev => prev.filter(day => day.dateKey !== dateKey));
   };
 
+  const getNextProgressPhotoInfo = (intervalDays: number) => {
+    if (!intervalDays || intervalDays < 0) {
+      return { nextDate: null, daysUntil: null };
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let lastDate: Date | null = null;
+    if (photoDays.length > 0) {
+      const sorted = [...photoDays].sort((a, b) => new Date(b.dateKey).getTime() - new Date(a.dateKey).getTime());
+      lastDate = new Date(sorted[0].dateKey);
+      lastDate.setHours(0, 0, 0, 0);
+    }
+
+    const baseDate = lastDate ?? today;
+    const nextDate = new Date(baseDate);
+    nextDate.setDate(baseDate.getDate() + intervalDays);
+
+    const msDiff = nextDate.getTime() - today.getTime();
+    const daysUntil = Math.max(0, Math.round(msDiff / (1000 * 60 * 60 * 24)));
+
+    return { nextDate, daysUntil };
+  };
+
   return (
-    <PhotoDayContext.Provider value={{ photoDays, setPhotoDays, addPhotoDay, updatePhotoDay, removePhotoDay }}>
+    <PhotoDayContext.Provider value={{ photoDays, setPhotoDays, addPhotoDay, updatePhotoDay, removePhotoDay, getNextProgressPhotoInfo }}>
       {children}
     </PhotoDayContext.Provider>
   );

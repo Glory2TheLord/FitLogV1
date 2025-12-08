@@ -29,6 +29,8 @@ export default function SettingsScreen() {
   const [calorieGoal, setCalorieGoal] = useState((preferences.dailyCalorieGoal ?? 0).toString());
   const [proteinGoal, setProteinGoal] = useState((preferences.dailyProteinGoal ?? 0).toString());
   const [cheatInterval, setCheatInterval] = useState((preferences.cheatMealIntervalDays ?? 7).toString());
+  const [weighInInterval, setWeighInInterval] = useState((preferences.daysUntilWeighInInterval ?? 7).toString());
+  const [progressPhotoInterval, setProgressPhotoInterval] = useState((preferences.daysUntilProgressPhotosInterval ?? 14).toString());
 
   const handleSavePrefs = () => {
     const steps = Number(stepGoal);
@@ -36,12 +38,16 @@ export default function SettingsScreen() {
     const cals = Number(calorieGoal);
     const protein = Number(proteinGoal);
     const cheatDays = Number(cheatInterval);
+    const weighDays = Number(weighInInterval);
+    const photoDays = Number(progressPhotoInterval);
     if (
       !Number.isFinite(steps) || steps <= 0 ||
       !Number.isFinite(water) || water <= 0 ||
       !Number.isFinite(cals) || cals <= 0 ||
       !Number.isFinite(protein) || protein <= 0 ||
-      !Number.isFinite(cheatDays) || cheatDays < 1
+      !Number.isFinite(cheatDays) || cheatDays < 1 ||
+      !Number.isFinite(weighDays) || weighDays < 0 ||
+      !Number.isFinite(photoDays) || photoDays < 0
     ) {
       return;
     }
@@ -51,6 +57,8 @@ export default function SettingsScreen() {
       dailyCalorieGoal: Math.round(cals),
       dailyProteinGoal: Math.round(protein),
       cheatMealIntervalDays: Math.round(cheatDays),
+      daysUntilWeighInInterval: Math.round(weighDays),
+      daysUntilProgressPhotosInterval: Math.round(photoDays),
     });
     setShowPrefsModal(false);
   };
@@ -90,6 +98,8 @@ export default function SettingsScreen() {
               setCalorieGoal((preferences.dailyCalorieGoal ?? 0).toString());
               setProteinGoal((preferences.dailyProteinGoal ?? 0).toString());
               setCheatInterval((preferences.cheatMealIntervalDays ?? 7).toString());
+              setWeighInInterval((preferences.daysUntilWeighInInterval ?? 7).toString());
+              setProgressPhotoInterval((preferences.daysUntilProgressPhotosInterval ?? 14).toString());
               setShowPrefsModal(true);
             }}
           >
@@ -228,6 +238,28 @@ export default function SettingsScreen() {
                 value={cheatInterval}
                 onChangeText={setCheatInterval}
                 placeholder="e.g. 7"
+                placeholderTextColor="#999"
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>DAYS UNTIL WEIGH IN</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                value={weighInInterval}
+                onChangeText={setWeighInInterval}
+                placeholder="e.g. 0"
+                placeholderTextColor="#999"
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>DAYS UNTIL PROGRESS PHOTOS</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                value={progressPhotoInterval}
+                onChangeText={setProgressPhotoInterval}
+                placeholder="e.g. 0"
                 placeholderTextColor="#999"
               />
             </View>
