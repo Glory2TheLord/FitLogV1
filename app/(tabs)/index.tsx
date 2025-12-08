@@ -88,8 +88,8 @@ export default function HomeScreen() {
 
   // ===== DERIVED VALUES FROM MEAL TRACKING =====
   // dailyTotals comes from context
-  // Calculate days to cheat meal from streak
-  const daysToCheatMeal = Math.max(0, 9 - goodEatingStreak);
+  // Calculate days to cheat meal using preference interval and eating streak
+  const daysToCheatMeal = Math.max(0, preferences.cheatMealIntervalDays - goodEatingStreak);
 
   // ===== STATUS COMPLETE STATES FOR MARK DAY ICONS =====
   // Steps complete: 10k steps or more

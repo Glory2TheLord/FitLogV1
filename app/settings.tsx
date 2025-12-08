@@ -28,17 +28,20 @@ export default function SettingsScreen() {
   const [waterGoal, setWaterGoal] = useState((preferences.dailyWaterGoal ?? 0).toString());
   const [calorieGoal, setCalorieGoal] = useState((preferences.dailyCalorieGoal ?? 0).toString());
   const [proteinGoal, setProteinGoal] = useState((preferences.dailyProteinGoal ?? 0).toString());
+  const [cheatInterval, setCheatInterval] = useState((preferences.cheatMealIntervalDays ?? 7).toString());
 
   const handleSavePrefs = () => {
     const steps = Number(stepGoal);
     const water = Number(waterGoal);
     const cals = Number(calorieGoal);
     const protein = Number(proteinGoal);
+    const cheatDays = Number(cheatInterval);
     if (
       !Number.isFinite(steps) || steps <= 0 ||
       !Number.isFinite(water) || water <= 0 ||
       !Number.isFinite(cals) || cals <= 0 ||
-      !Number.isFinite(protein) || protein <= 0
+      !Number.isFinite(protein) || protein <= 0 ||
+      !Number.isFinite(cheatDays) || cheatDays < 1
     ) {
       return;
     }
@@ -47,6 +50,7 @@ export default function SettingsScreen() {
       dailyWaterGoal: water,
       dailyCalorieGoal: Math.round(cals),
       dailyProteinGoal: Math.round(protein),
+      cheatMealIntervalDays: Math.round(cheatDays),
     });
     setShowPrefsModal(false);
   };
@@ -85,6 +89,7 @@ export default function SettingsScreen() {
               setWaterGoal((preferences.dailyWaterGoal ?? 0).toString());
               setCalorieGoal((preferences.dailyCalorieGoal ?? 0).toString());
               setProteinGoal((preferences.dailyProteinGoal ?? 0).toString());
+              setCheatInterval((preferences.cheatMealIntervalDays ?? 7).toString());
               setShowPrefsModal(true);
             }}
           >
@@ -170,7 +175,7 @@ export default function SettingsScreen() {
       <Modal visible={showPrefsModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Edit goals</Text>
+            <Text style={styles.modalTitle}>Goals</Text>
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Daily steps goal</Text>
               <TextInput
@@ -212,6 +217,17 @@ export default function SettingsScreen() {
                 value={proteinGoal}
                 onChangeText={setProteinGoal}
                 placeholder="e.g. 165"
+                placeholderTextColor="#999"
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>DAYS UNTIL CHEAT MEAL</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                value={cheatInterval}
+                onChangeText={setCheatInterval}
+                placeholder="e.g. 7"
                 placeholderTextColor="#999"
               />
             </View>
