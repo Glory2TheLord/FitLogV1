@@ -1,5 +1,5 @@
 import { ActivityLevel, useUserProfile } from '@/contexts/UserProfileContext';
-import React, { useEffect, useState } from 'react';
+import React, { ReactNode, useEffect, useState } from 'react';
 import {
     Alert,
     Modal,
@@ -17,9 +17,19 @@ type BaselineStatsModalProps = {
   visible: boolean;
   onClose: () => void;
   onSaved?: () => void;
+  onSaveBaseline?: (stats: { heightCm: number; weightKg: number; age: number }) => void;
+  primaryButtonContent?: ReactNode;
+  showCancelButton?: boolean;
 };
 
-export default function BaselineStatsModal({ visible, onClose, onSaved }: BaselineStatsModalProps) {
+export default function BaselineStatsModal({
+  visible,
+  onClose,
+  onSaved,
+  onSaveBaseline,
+  primaryButtonContent,
+  showCancelButton = true,
+}: BaselineStatsModalProps) {
 
   const { profile, updateProfile, recomputeMaintenance } = useUserProfile();
 
@@ -140,11 +150,11 @@ export default function BaselineStatsModal({ visible, onClose, onSaved }: Baseli
     // Convert feet/inches to cm
     const heightCmVal = feetInchesToCm(feetNum, inchesNum);
 
-    // Update profile
-    updateProfile({
-      age: ageNum,
-      sex,
-      heightCm: heightCmVal,
+  // Update profile
+  updateProfile({
+    age: ageNum,
+    sex,
+    heightCm: heightCmVal,
       startingWeight: startingWeightNum,
       currentWeight: currentWeightNum,
       goalWeight: goalWeightNum,
@@ -152,12 +162,20 @@ export default function BaselineStatsModal({ visible, onClose, onSaved }: Baseli
     });
 
     // Recompute maintenance calories
-    recomputeMaintenance();
+  recomputeMaintenance();
 
-    // Close modal and trigger callback
-    onClose();
-    onSaved?.();
-  };
+  // Close modal and trigger callback
+  const weightKgVal = currentWeightNum / 2.20462;
+  if (!isNaN(weightKgVal)) {
+    onSaveBaseline?.({
+      heightCm: heightCmVal,
+      weightKg: Math.round(weightKgVal * 10) / 10,
+      age: ageNum,
+    });
+  }
+  onClose();
+  onSaved?.();
+};
 
   const activityLabels: Record<ActivityLevel, string> = {
     sedentary: 'Sedentary (little/no exercise)',
@@ -173,10 +191,6 @@ export default function BaselineStatsModal({ visible, onClose, onSaved }: Baseli
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Baseline Stats</Text>
-          <Text style={styles.description}>
-            We use these details to estimate your maintenance calories, set your starting point,
-            and make your progress tracking more accurate.
-          </Text>
           <Text style={styles.description}>
             We use these details to estimate your maintenance calories, set your starting point,
             and make your progress tracking more accurate.
@@ -340,11 +354,17 @@ export default function BaselineStatsModal({ visible, onClose, onSaved }: Baseli
 
           {/* Buttons */}
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
+            {showCancelButton && (
+              <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-              <Text style={styles.saveButtonText}>Save</Text>
+              {primaryButtonContent ? (
+                primaryButtonContent
+              ) : (
+                <Text style={styles.saveButtonText}>Save</Text>
+              )}
             </TouchableOpacity>
           </View>
         </ScrollView>

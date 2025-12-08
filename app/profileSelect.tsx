@@ -156,7 +156,10 @@ const ProfileSelectScreen: React.FC = () => {
             onPress={handleContinue}
             activeOpacity={0.85}
           >
-            <Text style={styles.primaryButtonText}>Save & Continue</Text>
+            <Text style={styles.primaryButtonText}>
+              <Text style={[styles.primaryButtonText, { color: '#000000' }]}>Log</Text>
+              <Text style={styles.primaryButtonText}>in</Text>
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -314,7 +317,9 @@ const styles = StyleSheet.create({
   primaryButton: {
     marginTop: 4,
     height: 50,
-    borderRadius: 25,
+    minWidth: 220,
+    paddingHorizontal: 32,
+    borderRadius: 28,
     backgroundColor: ORANGE,
     alignItems: 'center',
     justifyContent: 'center',
