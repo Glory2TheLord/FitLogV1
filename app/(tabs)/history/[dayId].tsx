@@ -123,10 +123,7 @@ export default function HistoryDayDetailScreen() {
                 return (
                   <View key={ev.id} style={styles.timelineRow}>
                     <Text style={styles.timelineTime}>{time}</Text>
-                    <View style={styles.timelineContent}>
-                      <Text style={styles.timelineSummary}>{ev.summary}</Text>
-                      {renderTimelineDetails(ev)}
-                    </View>
+                    <View style={styles.timelineContent}>{renderTimelineRow(ev)}</View>
                   </View>
                 );
               })
@@ -143,68 +140,131 @@ export default function HistoryDayDetailScreen() {
   );
 }
 
-function renderTimelineDetails(event: any) {
-  if (!event?.details) return null;
+function renderTimelineComment(details: any) {
+  const comment = details?.comment ?? details?.notes ?? details?.newNotes;
+  if (!comment) return null;
+  return <Text style={styles.timelineComment}>{comment}</Text>;
+}
 
-  if (event.type === 'workoutLogged') {
-    const { workoutName, sets, repsPerSet, durationMinutes, isCardio, stepsAddedFromWorkout } = event.details as any;
-    if (isCardio && durationMinutes != null) {
-      return (
-        <Text style={styles.timelineDetails}>
-          {durationMinutes} min cardio{stepsAddedFromWorkout != null ? ` · ${stepsAddedFromWorkout} steps` : ''}
-        </Text>
-      );
+function renderTimelineRow(event: any) {
+  const details = event.details || {};
+
+  if (event.type === 'mealCompleted' || event.type === 'mealsAllCompleted') {
+    const mealName = details?.mealName ?? event.summary ?? 'Meal';
+    const calories = details?.calories;
+    const protein = details?.proteinGrams;
+    const completed = details?.mealsCompleted;
+    const planned = details?.mealsPlanned;
+
+    let mainText = mealName;
+    const parts: string[] = [];
+    if (calories != null) parts.push(`${calories} kcal`);
+    if (protein != null) parts.push(`${protein} g protein`);
+    if (parts.length > 0) {
+      mainText = `${mealName} — ${parts.join(', ')}`;
     }
+    if (event.type === 'mealsAllCompleted' && completed != null && planned != null) {
+      mainText = `Completed all meals (${completed}/${planned})`;
+    }
+
     return (
-      <Text style={styles.timelineDetails}>
-        {workoutName ? `${workoutName} ` : ''}
-        {sets != null ? `${sets} sets` : ''}{repsPerSet ? ` · reps: ${repsPerSet.join(', ')}` : ''}
-      </Text>
+      <>
+        <Text style={styles.timelineSummary}>{mainText}</Text>
+        {renderTimelineComment(details)}
+      </>
     );
   }
 
-  if (event.type === 'mealCompleted' && event.details) {
-    const { mealName, calories, proteinGrams } = event.details as any;
+  if (event.type === 'workoutLogged') {
+    const { workoutName, sets, repsPerSet, durationMinutes, isCardio, stepsAddedFromWorkout } = details as any;
+    let mainText = workoutName || event.summary;
+    if (isCardio && durationMinutes != null) {
+      const extra = stepsAddedFromWorkout != null ? ` · ${stepsAddedFromWorkout} steps` : '';
+      mainText = `${workoutName || 'Cardio'} — ${durationMinutes} min cardio${extra}`;
+    } else {
+      const repsText = repsPerSet ? ` reps: ${repsPerSet.join(', ')}` : '';
+      const setsText = sets != null ? `${sets} sets` : '';
+      mainText = `${workoutName || 'Workout'}${setsText ? ` — ${setsText}` : ''}${repsText ? ` ·${repsText}` : ''}`;
+    }
     return (
-      <Text style={styles.timelineDetails}>
-        {mealName ? `${mealName} — ` : ''}
-        {calories != null ? `${calories} kcal` : ''}
-        {proteinGrams != null ? ` · ${proteinGrams} g protein` : ''}
-      </Text>
+      <>
+        <Text style={styles.timelineSummary}>{mainText}</Text>
+        {renderTimelineComment(details)}
+      </>
     );
   }
 
   if (event.type === 'photosSlotCompleted' && event.details) {
     const { slot } = event.details as any;
-    return <Text style={styles.timelineDetails}>Slot: {slot}</Text>;
+    return (
+      <>
+        <Text style={styles.timelineSummary}>Completed progress photo: {slot}</Text>
+        {renderTimelineComment(details)}
+      </>
+    );
   }
 
   if (event.type === 'waterLogged' && event.details) {
     const { delta, current, waterGoal } = event.details as any;
-    return <Text style={styles.timelineDetails}>+{delta} L (total {current}/{waterGoal} L)</Text>;
+    return (
+      <>
+        <Text style={styles.timelineSummary}>+{delta} L (total {current}/{waterGoal} L)</Text>
+        {renderTimelineComment(details)}
+      </>
+    );
   }
 
   if (event.type === 'stepsLogged' && event.details) {
     const { delta, current, stepGoal } = event.details as any;
-    return <Text style={styles.timelineDetails}>+{delta} steps (total {current}/{stepGoal})</Text>;
+    return (
+      <>
+        <Text style={styles.timelineSummary}>+{delta} steps (total {current}/{stepGoal})</Text>
+        {renderTimelineComment(details)}
+      </>
+    );
   }
 
   if (event.type === 'goalWeightReached' && event.details) {
     const { weightLbs, goalWeightLbs } = event.details as any;
-    return <Text style={styles.timelineDetails}>Reached {weightLbs} lb (goal {goalWeightLbs} lb)</Text>;
+    return (
+      <>
+        <Text style={styles.timelineSummary}>Reached {weightLbs} lb (goal {goalWeightLbs} lb)</Text>
+        {renderTimelineComment(details)}
+      </>
+    );
   }
 
   if (event.type === 'workoutNotesUpdated' && event.details) {
     const { newNotes } = event.details as any;
     if (!newNotes) return null;
-    return <Text style={styles.timelineDetails}>{newNotes}</Text>;
+    return (
+      <>
+        <Text style={styles.timelineSummary}>Updated workout notes</Text>
+        <Text style={styles.timelineComment}>{newNotes}</Text>
+      </>
+    );
   }
 
   if (event.type === 'workoutEdited' && event.details) {
-    return <Text style={styles.timelineDetails}>Updated workout template settings.</Text>;
+    return (
+      <>
+        <Text style={styles.timelineSummary}>Updated workout template settings.</Text>
+        {renderTimelineComment(details)}
+      </>
+    );
   }
 
-  return null;
+  const summary = (event.summary || '').trim();
+  const detailsText = (details?.text || '').trim();
+  const shouldShowDetails = detailsText && detailsText.toLowerCase() !== summary.toLowerCase();
+
+  return (
+    <>
+      <Text style={styles.timelineSummary}>{summary || 'Event'}</Text>
+      {shouldShowDetails && <Text style={styles.timelineDetails}>{detailsText}</Text>}
+      {renderTimelineComment(details)}
+    </>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -279,6 +339,11 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#0F172A',
+  },
+  timelineComment: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 2,
   },
   timelineContent: {
     flex: 1,

@@ -87,6 +87,12 @@ export default function TabLayout() {
           title: 'History',
         }}
       />
+      <Tabs.Screen
+        name="history/[dayId]"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }
