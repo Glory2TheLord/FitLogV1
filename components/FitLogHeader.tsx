@@ -6,9 +6,10 @@ const ACCENT = '#f97316';
 
 type FitLogHeaderProps = {
   onSettingsPress?: () => void;
+  onPlusPress?: () => void;
 };
 
-export default function FitLogHeader({ onSettingsPress }: FitLogHeaderProps) {
+export default function FitLogHeader({ onSettingsPress, onPlusPress }: FitLogHeaderProps) {
   const handlePress = () => {
     console.log('Gear button pressed in FitLogHeader');
     console.log('onSettingsPress callback exists:', !!onSettingsPress);
@@ -49,6 +50,7 @@ export default function FitLogHeader({ onSettingsPress }: FitLogHeaderProps) {
         <TouchableOpacity
           style={styles.headerButton}
           activeOpacity={0.9}
+          onPress={onPlusPress}
         >
           <Feather
             name="plus"

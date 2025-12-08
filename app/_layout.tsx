@@ -8,6 +8,7 @@ import { Platform, StatusBar, View } from 'react-native';
 import { MealTrackingProvider } from '@/contexts/MealTrackingContext';
 import { PhotoDayProvider } from '@/contexts/PhotoDayContext';
 import { ProgramDaysProvider } from '@/contexts/ProgramDaysContext';
+import { DayMetricsProvider } from '@/contexts/DayMetricsContext';
 import { UserProvider, useUser } from '@/contexts/UserContext';
 import { UserProfileProvider } from '@/contexts/UserProfileContext';
 import { WorkoutsProvider } from '@/contexts/WorkoutsContext';
@@ -70,11 +71,13 @@ export default function RootLayout() {
       <UserProfileProvider>
         <ProgramDaysProvider>
           <MealTrackingProvider>
-            <WorkoutsProvider>
-              <PhotoDayProvider>
-                <AppShell />
-              </PhotoDayProvider>
-            </WorkoutsProvider>
+            <DayMetricsProvider>
+              <WorkoutsProvider>
+                <PhotoDayProvider>
+                  <AppShell />
+                </PhotoDayProvider>
+              </WorkoutsProvider>
+            </DayMetricsProvider>
           </MealTrackingProvider>
         </ProgramDaysProvider>
       </UserProfileProvider>

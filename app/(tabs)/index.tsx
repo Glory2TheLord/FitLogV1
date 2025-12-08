@@ -2,6 +2,7 @@ import FitLogHeader from '@/components/FitLogHeader';
 import { CALORIE_GOAL, PROTEIN_GOAL, useMealTracking } from '@/contexts/MealTrackingContext';
 import { useProgramDays } from '@/contexts/ProgramDaysContext';
 import { useUserProfile } from '@/contexts/UserProfileContext';
+import { useDayMetrics } from '@/contexts/DayMetricsContext';
 import { useWorkouts } from '@/contexts/WorkoutsContext';
 import {
     Feather,
@@ -16,6 +17,7 @@ import {
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View
 } from 'react-native';
@@ -37,6 +39,7 @@ type DaySummary = {
 export default function HomeScreen() {
   const router = useRouter();
   const { profile, activeProfile } = useUserProfile();
+  const { stepsToday, setStepsToday, addSteps, waterLiters, setWaterLiters, addWater } = useDayMetrics();
   
   // Get meal tracking context
   const { 
@@ -72,11 +75,11 @@ export default function HomeScreen() {
   const [isPedometerAvailable, setIsPedometerAvailable] = useState<
     boolean | null
   >(null);
-  const [stepsToday, setStepsToday] = useState<number>(0);
+  // stepsToday now comes from context
   const [stepError, setStepError] = useState<string | null>(null);
 
   // ===== WATER TRACKER STATE (manual for now) =====
-  const [waterLiters, setWaterLiters] = useState<number>(0.0);
+  // waterLiters now comes from context
 
   // ===== WEEKS-TO-GOAL TRACKER STATE (placeholder for now) =====
   const [weeksToGoal, setWeeksToGoal] = useState<number>(8);
@@ -398,9 +401,43 @@ export default function HomeScreen() {
     }
   };
 
+  // Quick add state
+  const [quickAddVisible, setQuickAddVisible] = useState(false);
+  const [stepsDialogVisible, setStepsDialogVisible] = useState(false);
+  const [waterDialogVisible, setWaterDialogVisible] = useState(false);
+  const [stepInput, setStepInput] = useState('');
+  const [waterInput, setWaterInput] = useState('');
+
+  const closeAllDialogs = () => {
+    setQuickAddVisible(false);
+    setStepsDialogVisible(false);
+    setWaterDialogVisible(false);
+    setStepInput('');
+    setWaterInput('');
+  };
+
+  const handleAddStepsConfirm = () => {
+    const amount = Number(stepInput);
+    if (Number.isFinite(amount) && amount > 0) {
+      addSteps(amount);
+    }
+    closeAllDialogs();
+  };
+
+  const handleAddWaterConfirm = () => {
+    const amount = Number(waterInput);
+    if (Number.isFinite(amount) && amount > 0) {
+      addWater(amount);
+    }
+    closeAllDialogs();
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-      <FitLogHeader onSettingsPress={handleSettingsPress} />
+      <FitLogHeader
+        onSettingsPress={handleSettingsPress}
+        onPlusPress={() => setQuickAddVisible(true)}
+      />
       
       <ScrollView
         style={styles.screenContent}
@@ -704,6 +741,89 @@ export default function HomeScreen() {
             </View>
         </View>
       </ScrollView>
+
+      {/* Quick Add Menu */}
+      {quickAddVisible && (
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setQuickAddVisible(false)}>
+          <View style={styles.quickAddMenu}>
+            <Text style={styles.quickAddTitle}>Quick add</Text>
+            <TouchableOpacity
+              style={styles.quickAddButton}
+              onPress={() => {
+                setQuickAddVisible(false);
+                setStepsDialogVisible(true);
+              }}
+            >
+              <Text style={styles.quickAddButtonText}>Add Steps</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quickAddButton}
+              onPress={() => {
+                setQuickAddVisible(false);
+                setWaterDialogVisible(true);
+              }}
+            >
+              <Text style={styles.quickAddButtonText}>Add Water</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quickAddCancel}
+              onPress={() => setQuickAddVisible(false)}
+            >
+              <Text style={styles.quickAddCancelText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      )}
+
+      {/* Add Steps Dialog */}
+      {stepsDialogVisible && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>How many steps do you want to add to today?</Text>
+            <TextInput
+              style={styles.modalInput}
+              keyboardType="numeric"
+              placeholder="e.g. 1000"
+              placeholderTextColor="#9ca3af"
+              value={stepInput}
+              onChangeText={setStepInput}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.modalButtonSecondary} onPress={closeAllDialogs}>
+                <Text style={styles.modalButtonSecondaryText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalButtonPrimary} onPress={handleAddStepsConfirm}>
+                <Text style={styles.modalButtonPrimaryText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Add Water Dialog */}
+      {waterDialogVisible && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>How much water do you want to add?</Text>
+            <TextInput
+              style={styles.modalInput}
+              keyboardType="numeric"
+              placeholder="e.g. 0.5"
+              placeholderTextColor="#9ca3af"
+              value={waterInput}
+              onChangeText={setWaterInput}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.modalButtonSecondary} onPress={closeAllDialogs}>
+                <Text style={styles.modalButtonSecondaryText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalButtonPrimary} onPress={handleAddWaterConfirm}>
+                <Text style={styles.modalButtonPrimaryText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -1002,5 +1122,131 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.3,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 90,
+  },
+  quickAddMenu: {
+    width: 220,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: '#000000',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 5,
+    gap: 8,
+  },
+  quickAddTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1a1a1a',
+    marginBottom: 4,
+  },
+  quickAddButton: {
+    backgroundColor: '#F9F9F9',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+  },
+  quickAddButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  quickAddCancel: {
+    marginTop: 4,
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  quickAddCancelText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#6b7280',
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 2,
+    borderColor: '#000000',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 6,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  modalInput: {
+    borderWidth: 1.5,
+    borderColor: '#E5E5E5',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    color: '#111827',
+    backgroundColor: '#F9FAFB',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+  },
+  modalButtonPrimary: {
+    flex: 1,
+    backgroundColor: ACCENT,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  modalButtonPrimaryText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  modalButtonSecondary: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  modalButtonSecondaryText: {
+    color: '#4B5563',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });
