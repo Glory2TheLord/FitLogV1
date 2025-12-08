@@ -7,6 +7,11 @@ const BASE_STORAGE_KEY_USER_PROFILE = 'fitlog_user_profile_v1';
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
 
+export type WeighIn = {
+  date: string; // ISO string
+  weightLbs: number;
+};
+
 export type UserProfile = {
   age: number | null;
   sex: 'male' | 'female' | 'other' | null;
@@ -16,6 +21,8 @@ export type UserProfile = {
   startingWeight: number | null; // in lb - weight when user first started tracking
   activityLevel: ActivityLevel;
   maintenanceCalories: number | null;
+  weighIns?: WeighIn[];
+  weeksUntilGoal?: number | null;
 };
 
 type UserProfileContextType = {
@@ -24,6 +31,7 @@ type UserProfileContextType = {
   recomputeMaintenance: () => void;
   updateBaselineStats: (profileId: string, stats: BaselineStats) => void;
   activeProfile: FitLogUser | null;
+  recordWeighIn: (weightLbs: number) => void;
 };
 
 const UserProfileContext = createContext<UserProfileContextType | undefined>(undefined);
@@ -53,6 +61,7 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
   
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
   const [isLoaded, setIsLoaded] = useState(false);
+  const WEIGH_IN_HISTORY_LIMIT = 10;
 
   // Load from AsyncStorage when user changes
   useEffect(() => {
@@ -116,6 +125,38 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
     setProfile(prev => ({ ...prev, ...partial }));
   };
 
+  const calculateWeeksUntilGoal = (weighIns: WeighIn[], goalWeightLbs: number | null): number | null => {
+    if (!goalWeightLbs || weighIns.length < 2) return null;
+    const sorted = [...weighIns].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const prev = sorted[sorted.length - 2];
+    const latest = sorted[sorted.length - 1];
+    const prevDate = new Date(prev.date);
+    const latestDate = new Date(latest.date);
+    const daysBetween = Math.max((latestDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24), 1);
+    const delta = prev.weightLbs - latest.weightLbs; // positive = lost
+    const ratePerWeek = (delta * 7) / daysBetween;
+    if (ratePerWeek <= 0) return null;
+    const remaining = latest.weightLbs - goalWeightLbs;
+    if (remaining <= 0) return 0;
+    const weeksRemaining = remaining / ratePerWeek;
+    return Math.max(0, weeksRemaining);
+  };
+
+  const recordWeighIn = (weightLbs: number) => {
+    if (!Number.isFinite(weightLbs) || weightLbs <= 0) return;
+    setProfile(prev => {
+      const weighIns = [...(prev.weighIns || []), { date: new Date().toISOString(), weightLbs }];
+      const limited = weighIns.slice(-WEIGH_IN_HISTORY_LIMIT);
+      const weeksUntilGoal = calculateWeeksUntilGoal(limited, prev.goalWeight ?? null);
+      return {
+        ...prev,
+        currentWeight: weightLbs,
+        weighIns: limited,
+        weeksUntilGoal,
+      };
+    });
+  };
+
   const updateBaselineStats = (profileId: string, stats: BaselineStats) => {
     updateUserBaselineStats(profileId, stats);
     const weightLb = Math.round(stats.weightKg * 2.20462 * 10) / 10;
@@ -163,6 +204,7 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
         updateProfile,
         recomputeMaintenance,
         updateBaselineStats,
+        recordWeighIn,
       }}
     >
       {children}

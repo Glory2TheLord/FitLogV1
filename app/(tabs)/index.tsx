@@ -39,7 +39,7 @@ type DaySummary = {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { profile, activeProfile } = useUserProfile();
+  const { profile, activeProfile, recordWeighIn } = useUserProfile();
   const { stepsToday, setStepsToday, addSteps, waterLiters, setWaterLiters, addWater } = useDayMetrics();
   
   // Get meal tracking context
@@ -82,9 +82,6 @@ export default function HomeScreen() {
 
   // ===== WATER TRACKER STATE (manual for now) =====
   // waterLiters now comes from context
-
-  // ===== WEEKS-TO-GOAL TRACKER STATE (placeholder for now) =====
-  const [weeksToGoal, setWeeksToGoal] = useState<number>(8);
 
   // ===== DERIVED VALUES FROM MEAL TRACKING =====
   // dailyTotals comes from context
@@ -252,9 +249,13 @@ export default function HomeScreen() {
   });
 
   const formattedWater = `${waterLiters.toFixed(1)}L`;
-  const formattedWeeksToGoal = estimatedWeeksToGoal !== null
-    ? `${estimatedWeeksToGoal} wks`
-    : (weeksToGoal <= 0 ? '--' : `${weeksToGoal} wks`);
+  const weeksToGoalFromWeighIns = profile.weeksUntilGoal ?? null;
+  const formattedWeeksToGoal = (() => {
+    if (weeksToGoalFromWeighIns === null || weeksToGoalFromWeighIns === undefined) return '--';
+    if (weeksToGoalFromWeighIns <= 0) return '0 wks';
+    const rounded = Math.round(weeksToGoalFromWeighIns);
+    return `${rounded} wks`;
+  })();
 
   const formattedStepsWeek = stepsThisWeek.toLocaleString('en-US');
 
@@ -409,13 +410,25 @@ export default function HomeScreen() {
   const [waterDialogVisible, setWaterDialogVisible] = useState(false);
   const [stepInput, setStepInput] = useState('');
   const [waterInput, setWaterInput] = useState('');
+  const [weighDialogVisible, setWeighDialogVisible] = useState(false);
+  const [weighInput, setWeighInput] = useState('');
 
   const closeAllDialogs = () => {
     setQuickAddVisible(false);
     setStepsDialogVisible(false);
     setWaterDialogVisible(false);
+    setWeighDialogVisible(false);
     setStepInput('');
     setWaterInput('');
+    setWeighInput('');
+  };
+
+  const handleWeighInConfirm = () => {
+    const amount = Number(weighInput);
+    if (Number.isFinite(amount) && amount > 0) {
+      recordWeighIn(amount);
+    }
+    closeAllDialogs();
   };
 
   const handleAddStepsConfirm = () => {
@@ -783,6 +796,15 @@ export default function HomeScreen() {
               <Text style={styles.quickAddButtonText}>Add Water</Text>
             </TouchableOpacity>
             <TouchableOpacity
+              style={styles.quickAddButton}
+              onPress={() => {
+                setQuickAddVisible(false);
+                setWeighDialogVisible(true);
+              }}
+            >
+              <Text style={styles.quickAddButtonText}>Weigh in</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={styles.quickAddCancel}
               onPress={() => setQuickAddVisible(false)}
             >
@@ -836,6 +858,31 @@ export default function HomeScreen() {
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalButtonPrimary} onPress={handleAddWaterConfirm}>
                 <Text style={styles.modalButtonPrimaryText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Weigh In Dialog */}
+      {weighDialogVisible && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>What is your current weight (lbs)?</Text>
+            <TextInput
+              style={styles.modalInput}
+              keyboardType="numeric"
+              placeholder="e.g. 165"
+              placeholderTextColor="#9ca3af"
+              value={weighInput}
+              onChangeText={setWeighInput}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.modalButtonSecondary} onPress={closeAllDialogs}>
+                <Text style={styles.modalButtonSecondaryText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalButtonPrimary} onPress={handleWeighInConfirm}>
+                <Text style={styles.modalButtonPrimaryText}>Save</Text>
               </TouchableOpacity>
             </View>
           </View>
