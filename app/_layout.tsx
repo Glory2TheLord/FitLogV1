@@ -16,7 +16,7 @@ import { WorkoutsProvider } from '@/contexts/WorkoutsContext';
 import ProfileSelectScreen from './profileSelect';
 
 function AppShell() {
-  const { currentUser, loading } = useUser();
+  const { currentUser, isLoaded } = useUser();
 
   const statusBarHeight =
     Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0;
@@ -53,7 +53,7 @@ function AppShell() {
       />
 
       {/* If we are still initializing, avoid flashing layouts */}
-      {loading ? null : !currentUser ? (
+      {!isLoaded ? null : !currentUser ? (
         // No profile yet -> show login/profile selection
         <ProfileSelectScreen />
       ) : (

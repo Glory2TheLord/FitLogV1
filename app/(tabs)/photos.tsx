@@ -101,7 +101,7 @@ export default function PhotosScreen() {
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateTitle}>No photo check-ins yet</Text>
             <Text style={styles.emptyStateText}>
-              Tap "Add Check-in" to create your first progress album.
+              {'Tap "Add Check-in" to create your first progress album.'}
             </Text>
           </View>
         ) : (

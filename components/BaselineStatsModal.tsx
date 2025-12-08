@@ -361,13 +361,6 @@ const styles = StyleSheet.create({
     color: '#555',
     textAlign: 'left',
   },
-  description: {
-    marginTop: 8,
-    marginBottom: 16,
-    fontSize: 13,
-    color: '#555',
-    textAlign: 'left',
-  },
     heightRow: {
       flexDirection: 'row',
       gap: 12,

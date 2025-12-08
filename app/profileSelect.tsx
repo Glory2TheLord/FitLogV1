@@ -1,3 +1,4 @@
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -12,29 +13,25 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import BaselineStatsModal from '../components/BaselineStatsModal';
-import { useUser } from '../contexts/UserContext';
+import { FitLogUser, useUser } from '../contexts/UserContext';
 
 const ORANGE = '#F97316';
 const CREAM = '#FFF7EA';
 
-
 const ProfileSelectScreen: React.FC = () => {
   const [profileName, setProfileName] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [showBaselineModal, setShowBaselineModal] = useState(false);
   const { users, addUser, setCurrentUser, deleteUser } = useUser();
   const router = useRouter();
 
   // Select profile from dropdown
-  const handleSelectProfile = (profile) => {
+  const handleSelectProfile = (profile: FitLogUser) => {
     setProfileName(profile.name);
     setDropdownOpen(false);
   };
 
   // Delete profile logic
-  const handleDeleteProfile = (profile) => {
+  const handleDeleteProfile = (profile: FitLogUser) => {
     Alert.alert(
       'Delete profile?',
       `Are you sure you want to delete "${profile.name}"? This cannot be undone.`,
@@ -67,50 +64,42 @@ const ProfileSelectScreen: React.FC = () => {
     );
 
     if (existing) {
-      setCurrentUser(existing);
-      setShowBaselineModal(false);
-      router.replace('/(tabs)');
+      setCurrentUser(existing.id);
+      const hasBaseline = !!existing.baselineStats;
+      router.replace(hasBaseline ? '/(tabs)' : '/baselineStats');
       return;
     }
 
     // New profile: create it and open baseline stats
     const newUser = addUser(trimmedName);
     if (newUser) {
-      setCurrentUser(newUser);
+      setCurrentUser(newUser.id);
+      router.replace('/baselineStats');
     }
-    setShowBaselineModal(true);
   };
-
-  // Watch for new user to appear in users, then show modal
-  React.useEffect(() => {
-    if (pendingBaselineName) {
-      const created = users.find(
-        (u) => u.name.toLowerCase() === pendingBaselineName.toLowerCase()
-      );
-      if (created) {
-        setCurrentUser(created);
-        setShowBaselineModal(true);
-        setPendingBaselineName('');
-      }
-    }
-  }, [users, pendingBaselineName, setCurrentUser]);
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.centeredHeader}>
-        <Image
-          source={require('../assets/fitlog-logo2.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <View style={styles.taglineRow}>
-          <Text style={styles.taglineText}>Track it. All in one place</Text>
-          <Text style={styles.checkIcon}>✓</Text>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.centeredHeader}>
+          <Image
+            source={require('../assets/fitlog-logo2.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <View style={styles.taglineRow}>
+            <Text style={styles.taglineText}>Track it. All in one place</Text>
+            <Text style={styles.checkIcon}>✓</Text>
+          </View>
         </View>
-      </View>
-      <View style={styles.profileCard}>
+        <View style={styles.profileCard}>
           <Text style={styles.profileLabel}>Profile</Text>
           <TouchableOpacity
             style={styles.dropdownButton}
@@ -154,7 +143,7 @@ const ProfileSelectScreen: React.FC = () => {
           <View style={styles.dropdownDivider} />
           <TextInput
             style={styles.input}
-            placeholder="Create new profile…"
+                        placeholder="Create new profile"
             value={profileName}
             onChangeText={setProfileName}
             placeholderTextColor="#B0B0B0"
@@ -170,16 +159,6 @@ const ProfileSelectScreen: React.FC = () => {
             <Text style={styles.primaryButtonText}>Save & Continue</Text>
           </TouchableOpacity>
         </View>
-        <BaselineStatsModal
-          visible={showBaselineModal}
-          onClose={() => {
-            setShowBaselineModal(false);
-          }}
-          onSaved={() => {
-            setShowBaselineModal(false);
-            router.replace('/(tabs)');
-          }}
-        />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -348,4 +327,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-

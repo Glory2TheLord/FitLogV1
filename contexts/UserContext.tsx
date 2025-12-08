@@ -4,10 +4,17 @@ import React, { createContext, ReactNode, useContext, useEffect, useState } from
 const STORAGE_KEY_USERS = 'fitlog_users_v1';
 const STORAGE_KEY_CURRENT_USER = 'fitlog_current_user_v1';
 
+export type BaselineStats = {
+  heightCm: number;
+  weightKg: number;
+  age: number;
+};
+
 export type FitLogUser = {
   id: string;
   name: string;
   createdAt: string;
+  baselineStats?: BaselineStats;
 };
 
 type UserContextValue = {
@@ -15,9 +22,10 @@ type UserContextValue = {
   currentUser: FitLogUser | null;
   setCurrentUser: (userId: string) => void;
   clearCurrentUser: () => void;
-  addUser: (name: string) => void;
+  addUser: (name: string) => FitLogUser | null;
   deleteUser: (userId: string) => void;
   isLoaded: boolean;
+  updateUserBaselineStats: (userId: string, stats: BaselineStats) => void;
 };
 
 const UserContext = createContext<UserContextValue | undefined>(undefined);
@@ -100,15 +108,27 @@ export function UserProvider({ children }: { children: ReactNode }) {
     setCurrentUserState(null);
   };
 
-  const addUser = (name: string) => {
+  const addUser = (name: string): FitLogUser | null => {
     const newUser: FitLogUser = {
       id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       name: name.trim(),
       createdAt: new Date().toISOString(),
+      baselineStats: undefined,
     };
 
     setUsers(prev => [...prev, newUser]);
     setCurrentUserState(newUser); // Automatically select the new user
+    return newUser;
+  };
+
+  const updateUserBaselineStats = (userId: string, stats: BaselineStats) => {
+    setUsers(prev =>
+      prev.map(u => (u.id === userId ? { ...u, baselineStats: stats } : u))
+    );
+
+    if (currentUser?.id === userId) {
+      setCurrentUserState(prev => (prev ? { ...prev, baselineStats: stats } : prev));
+    }
   };
 
   // Delete user and their data
@@ -140,6 +160,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         addUser,
         deleteUser,
         isLoaded,
+        updateUserBaselineStats,
       }}
     >
       {children}

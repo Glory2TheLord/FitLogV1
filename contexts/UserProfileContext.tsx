@@ -1,7 +1,7 @@
 import { getUserScopedKey } from '@/storage/userScopedKey';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { useUser } from './UserContext';
+import { BaselineStats, FitLogUser, useUser } from './UserContext';
 
 const BASE_STORAGE_KEY_USER_PROFILE = 'fitlog_user_profile_v1';
 
@@ -22,6 +22,8 @@ type UserProfileContextType = {
   profile: UserProfile;
   updateProfile: (partial: Partial<UserProfile>) => void;
   recomputeMaintenance: () => void;
+  updateBaselineStats: (profileId: string, stats: BaselineStats) => void;
+  activeProfile: FitLogUser | null;
 };
 
 const UserProfileContext = createContext<UserProfileContextType | undefined>(undefined);
@@ -46,7 +48,7 @@ const DEFAULT_PROFILE: UserProfile = {
 };
 
 export function UserProfileProvider({ children }: { children: ReactNode }) {
-  const { currentUser } = useUser();
+  const { currentUser, updateUserBaselineStats } = useUser();
   const userId = currentUser?.id ?? null;
   
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
@@ -114,6 +116,18 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
     setProfile(prev => ({ ...prev, ...partial }));
   };
 
+  const updateBaselineStats = (profileId: string, stats: BaselineStats) => {
+    updateUserBaselineStats(profileId, stats);
+    const weightLb = Math.round(stats.weightKg * 2.20462 * 10) / 10;
+
+    setProfile(prev => ({
+      ...prev,
+      heightCm: stats.heightCm,
+      currentWeight: weightLb,
+      age: stats.age,
+    }));
+  };
+
   const recomputeMaintenance = () => {
     // Check if we have all required inputs
     if (!profile.age || !profile.sex || !profile.heightCm || !profile.currentWeight) {
@@ -145,8 +159,10 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
     <UserProfileContext.Provider
       value={{
         profile,
+        activeProfile: currentUser ?? null,
         updateProfile,
         recomputeMaintenance,
+        updateBaselineStats,
       }}
     >
       {children}

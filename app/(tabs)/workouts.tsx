@@ -336,20 +336,21 @@ export default function WorkoutsScreen() {
       }
 
       // Add workout to today
-      const newWorkout: Omit<WorkoutEntry, 'id'> = {
-        name: workoutName.trim(),
-        type: workoutType,
-        minutes: minutesNumber || null,
-        sets: setsNumber || null,
-        reps: repsNumber || null,
-        weight: weightNumber || null,
-        notes: workoutNotes.trim() || '',
-        isCompleted: false,
+      const newWorkout: Omit<WorkoutEntry, 'id' | 'createdAt' | 'isCompleted'> = {
+        dateKey: todayDateKey,
+        programDayId: programDay.id,
         programDayIndex: programDay.index,
         focusLabel: programDay.name,
+        name: workoutName.trim(),
+        type: workoutType,
+        minutes: minutesNumber ?? undefined,
+        sets: setsNumber ?? undefined,
+        reps: repsNumber ?? undefined,
+        weight: weightNumber ?? undefined,
+        notes: workoutNotes.trim() || undefined,
       };
 
-      addWorkout(todayDateKey, newWorkout);
+      addWorkout(newWorkout);
     }
 
     // Reset and close
@@ -398,7 +399,7 @@ export default function WorkoutsScreen() {
           </View>
 
           <View style={styles.workoutsCard}>
-            <Text style={styles.workoutsTitle}>Today's Workouts</Text>
+            <Text style={styles.workoutsTitle}>{"Today's Workouts"}</Text>
 
             {workoutSlots.map((slot) => {
               const isExpanded = expandedSlotId === slot.id;
@@ -776,6 +777,11 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     marginBottom: 16,
     textAlign: 'center',
+  },
+  workoutSubtitle: {
+    marginTop: 6,
+    color: '#4b5563',
+    fontSize: 13,
   },
   workoutSlot: {
     backgroundColor: '#FFFFFF',
