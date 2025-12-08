@@ -36,7 +36,7 @@ type DaySummary = {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { profile } = useUserProfile();
+  const { profile, activeProfile } = useUserProfile();
   
   // Get meal tracking context
   const { 
@@ -409,6 +409,13 @@ export default function HomeScreen() {
       >
         <View style={styles.pageTitleRow}>
           <Text style={styles.pageTitle}>Home</Text>
+          <Text style={styles.welcomeText}>
+            <Text style={styles.welcomeText}>Welcome back, </Text>
+            {activeProfile?.name ? (
+              <Text style={styles.welcomeName}>{activeProfile.name}</Text>
+            ) : null}
+            <Text style={styles.welcomeText}>!</Text>
+          </Text>
         </View>
         
         <View style={styles.homeCardsContainer}>
@@ -718,12 +725,23 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 4,
     paddingBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   pageTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: '#000000',
     letterSpacing: 0.3,
+  },
+  welcomeText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  welcomeName: {
+    color: ACCENT,
   },
   homeCardsContainer: {
     gap: 8,
