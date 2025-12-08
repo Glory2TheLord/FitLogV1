@@ -53,7 +53,7 @@ type WorkoutsContextValue = {
   workoutsByDate: WorkoutsByDate;
   workoutTemplates: WorkoutTemplate[];
   customWorkouts: CustomWorkout[];
-  addWorkout: (entry: Omit<WorkoutEntry, 'id' | 'createdAt' | 'isCompleted'>) => void;
+  addWorkout: (entry: Omit<WorkoutEntry, 'id' | 'createdAt' | 'isCompleted'>) => WorkoutEntry;
   updateWorkout: (
     dateKey: string,
     workoutId: string,
@@ -208,7 +208,7 @@ export function WorkoutsProvider({ children }: { children: ReactNode }) {
     saveCustom();
   }, [customWorkouts, isLoaded, userId]);
 
-  const addWorkout = (entry: Omit<WorkoutEntry, 'id' | 'createdAt' | 'isCompleted'>) => {
+  const addWorkout = (entry: Omit<WorkoutEntry, 'id' | 'createdAt' | 'isCompleted'>): WorkoutEntry => {
     const newWorkout: WorkoutEntry = {
       ...entry,
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
@@ -223,6 +223,7 @@ export function WorkoutsProvider({ children }: { children: ReactNode }) {
         [entry.dateKey]: [...dateWorkouts, newWorkout],
       };
     });
+    return newWorkout;
   };
 
   const updateWorkout = (

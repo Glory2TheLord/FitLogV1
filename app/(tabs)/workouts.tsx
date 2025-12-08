@@ -166,19 +166,50 @@ export default function WorkoutsScreen() {
     } else {
       setIsCustomWorkout(false);
       setEditingTemplateId(null);
-      // Find template and create workout entry
+      // Find template and update workout entry for this slot
       const template =
         workoutTemplates.find(t => t.id === templateId) ||
         allCustomWorkouts.find(t => t.id === templateId);
       if (!template || !programDay) return;
 
-      // Update only the selected slot locally
+      // Determine existing workout entry for this slot (by index)
+      const slotIndex = workoutSlots.findIndex(s => s.id === slotId);
+      const existingEntry = todayWorkouts[slotIndex];
+
+      if (existingEntry) {
+        updateWorkout(todayDateKey, existingEntry.id, {
+          name: template.name,
+          type: template.type,
+          minutes: template.defaultMinutes,
+          sets: template.defaultSets,
+          reps: template.defaultReps,
+          weight: template.defaultWeight,
+          steps: template.defaultSteps,
+        });
+      } else {
+        addWorkout({
+          dateKey: todayDateKey,
+          programDayId: programDay.id,
+          programDayIndex: programDay.index,
+          focusLabel: programDay.name,
+          name: template.name,
+          type: template.type,
+          minutes: template.defaultMinutes,
+          sets: template.defaultSets,
+          reps: template.defaultReps,
+          weight: template.defaultWeight,
+          steps: template.defaultSteps,
+          notes: '',
+        });
+      }
+
+      // Update slot locally without changing count
       setWorkoutSlots(prev =>
         prev.map(slot =>
           slot.id === slotId
             ? {
                 ...slot,
-                selectedWorkoutId: slot.selectedWorkoutId ?? `temp-${Date.now()}`,
+                selectedWorkoutId: existingEntry ? existingEntry.id : slot.selectedWorkoutId,
                 selectedWorkoutData: {
                   name: template.name,
                   type: template.type,
@@ -187,38 +218,13 @@ export default function WorkoutsScreen() {
                   weight: template.defaultWeight ?? null,
                   minutes: template.defaultMinutes ?? null,
                   steps: template.defaultSteps ?? null,
-                  notes: '',
+                  notes: slot.selectedWorkoutData?.notes ?? '',
                 },
-                isCompleted: false,
+                isCompleted: slot.isCompleted,
               }
             : slot
         )
       );
-
-      // Persist/update workout entry in context for this date
-      const currentSlot = workoutSlots.find(s => s.id === slotId);
-      const existingForSlot = currentSlot
-        ? todayWorkouts.find(w => w.id === currentSlot.selectedWorkoutId)
-        : undefined;
-      const newWorkoutEntry: Omit<WorkoutEntry, 'id' | 'createdAt' | 'isCompleted'> = {
-        dateKey: todayDateKey,
-        programDayId: programDay.id,
-        programDayIndex: programDay.index,
-        focusLabel: programDay.name,
-        name: template.name,
-        type: template.type,
-        minutes: template.defaultMinutes,
-        sets: template.defaultSets,
-        reps: template.defaultReps,
-        weight: template.defaultWeight,
-        steps: template.defaultSteps,
-        notes: existingForSlot?.notes ?? '',
-      };
-      if (existingForSlot) {
-        updateWorkout(todayDateKey, existingForSlot.id, newWorkoutEntry);
-      } else {
-        addWorkout(newWorkoutEntry);
-      }
       setExpandedSlotId(null);
     }
   };
@@ -481,11 +487,8 @@ export default function WorkoutsScreen() {
         return;
       }
 
-      let chosenTemplateId: string | null = null;
-      let chosenTemplate: WorkoutTemplate | CustomWorkout | null = null;
-
       if (isCustomWorkout) {
-        const created = addCustomWorkout({
+        addCustomWorkout({
           name: workoutName.trim(),
           type: workoutType,
           defaultMinutes: minutesNumber,
@@ -495,12 +498,10 @@ export default function WorkoutsScreen() {
           defaultSteps: stepsNumber,
           programDayIds: selectedProgramDayIds,
         });
-        chosenTemplateId = created.id;
-        chosenTemplate = created;
       }
 
-      // Add workout to today
-      const newWorkout: Omit<WorkoutEntry, 'id' | 'createdAt' | 'isCompleted'> = {
+      // Add workout to today (new entry)
+      addWorkout({
         dateKey: todayDateKey,
         programDayId: programDay.id,
         programDayIndex: programDay.index,
@@ -513,32 +514,7 @@ export default function WorkoutsScreen() {
         weight: weightNumber ?? undefined,
         steps: stepsNumber ?? undefined,
         notes: workoutNotes.trim() || undefined,
-      };
-
-      addWorkout(newWorkout);
-
-      if (chosenTemplateId && chosenTemplate) {
-        setWorkoutSlots(prev =>
-          prev.map(slot =>
-            slot.id === (currentEditingSlotId ?? slot.id)
-              ? {
-                  ...slot,
-                  selectedWorkoutId: chosenTemplateId,
-                  selectedWorkoutData: {
-                    name: chosenTemplate.name,
-                    type: chosenTemplate.type,
-                    sets: chosenTemplate.defaultSets ?? null,
-                    reps: chosenTemplate.defaultReps ?? null,
-                    weight: chosenTemplate.defaultWeight ?? null,
-                    minutes: chosenTemplate.defaultMinutes ?? null,
-                    steps: chosenTemplate.defaultSteps ?? null,
-                  },
-                  isCompleted: false,
-                }
-              : slot
-          )
-        );
-      }
+      });
     }
 
     // Reset and close
