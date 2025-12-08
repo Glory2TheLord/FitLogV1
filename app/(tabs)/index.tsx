@@ -2,7 +2,7 @@ import FitLogHeader from '@/components/FitLogHeader';
 import { useMealTracking } from '@/contexts/MealTrackingContext';
 import { useProgramDays } from '@/contexts/ProgramDaysContext';
 import { useUserProfile } from '@/contexts/UserProfileContext';
-import { useDayMetrics } from '@/contexts/DayMetricsContext';
+import { DayHistoryEntry, useDayMetrics } from '@/contexts/DayMetricsContext';
 import { usePreferences } from '@/contexts/PreferencesContext';
 import { useWorkouts } from '@/contexts/WorkoutsContext';
 import { usePhotoDays } from '@/contexts/PhotoDayContext';
@@ -28,20 +28,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // Brand orange
 const ACCENT = '#f97316';
 
-// Type for daily history tracking
-type DaySummary = {
-  date: string; // ISO date YYYY-MM-DD
-  calories: number;
-  protein: number;
-  steps: number;
-  didWorkout: boolean;
-  weight?: number; // optional if there was a weigh-in that day
-};
-
 export default function HomeScreen() {
   const router = useRouter();
   const { profile, activeProfile, recordWeighIn, isWeighInRequiredOn } = useUserProfile();
-  const { stepsToday, setStepsToday, addSteps, waterLiters, setWaterLiters, addWater, resetTodayTrackingToDefaults } = useDayMetrics();
+  const {
+    stepsToday,
+    setStepsToday,
+    addSteps,
+    waterLiters,
+    setWaterLiters,
+    addWater,
+    resetTodayTrackingToDefaults,
+    history,
+    upsertHistoryEntry,
+  } = useDayMetrics();
   
   // Get meal tracking context
   const {
@@ -61,7 +61,6 @@ export default function HomeScreen() {
   // Get workouts context
   const {
     getWorkoutsForDate,
-    hasCompletedWorkoutsForDate,
     clearWorkoutsForDate,
   } = useWorkouts();
   
@@ -142,9 +141,6 @@ export default function HomeScreen() {
     return meetsCalories && meetsProtein && allSelectedSlotsCompleted && !cheatUsedToday;
   })();
 
-  // Workouts complete: all workouts for today are marked complete
-  const workoutsComplete = hasCompletedWorkoutsForDate(todayDateKey);
-
   // Stubs for future features
   const [photosComplete, setPhotosComplete] = useState(false);
   const [weighInComplete, setWeighInComplete] = useState(false);
@@ -155,21 +151,20 @@ export default function HomeScreen() {
   const [avgWaterThisWeek] = useState<number>(2.1); // liters
 
   // ===== DAY HISTORY & GOAL ESTIMATION =====
-  const [dayHistory, setDayHistory] = useState<DaySummary[]>([]);
   const [estimatedDaysToGoal, setEstimatedDaysToGoal] = useState<number | null>(null);
 
   // ===== WORKOUT STREAK - Calculate from consecutive days with workouts completed =====
   const calculateWorkoutStreak = () => {
     try {
-      if (!dayHistory || dayHistory.length === 0) return 0;
-      
+      if (!history || history.length === 0) return 0;
+
       let streak = 0;
-      // Start from most recent day and count backwards
-      for (let i = dayHistory.length - 1; i >= 0; i--) {
-        if (dayHistory[i] && dayHistory[i].didWorkout) {
+      const sorted = [...history].sort((a, b) => b.id.localeCompare(a.id));
+      for (const entry of sorted) {
+        if (entry.workoutsCompleted > 0) {
           streak++;
         } else {
-          break; // Streak is broken
+          break;
         }
       }
       return streak;
@@ -188,7 +183,7 @@ export default function HomeScreen() {
 
   // Computed weight values
   // Show 0 for lost weight until user has completed at least one day
-  const poundsLost = dayHistory.length > 0 ? startingWeight - currentWeight : 0;
+  const poundsLost = history.length > 0 ? startingWeight - currentWeight : 0;
   const poundsToGo = currentWeight - goalWeight;
 
   // Derive estimated weeks to goal from days
@@ -332,7 +327,7 @@ export default function HomeScreen() {
   };
 
   // ===== GOAL ESTIMATION HELPER =====
-  const recalculateEstimatedDaysToGoal = (history: DaySummary[]) => {
+  const recalculateEstimatedDaysToGoal = (entries: DayHistoryEntry[]) => {
     if (!goalWeight || !currentWeight) {
       setEstimatedDaysToGoal(null);
       return;
@@ -348,7 +343,7 @@ export default function HomeScreen() {
     const MAINTENANCE_CALORIES = profile.maintenanceCalories ?? 2000;
 
     // Use the last 14 days to estimate average daily deficit
-    const recentDays = history.slice(-14);
+    const recentDays = entries.slice(0, 14);
     if (recentDays.length === 0) {
       setEstimatedDaysToGoal(null);
       return;
@@ -380,23 +375,47 @@ export default function HomeScreen() {
     // - Use actual weight trend from weigh-ins rather than only calories
   };
 
+  useEffect(() => {
+    recalculateEstimatedDaysToGoal(history);
+  }, [history]);
+
   // ===== LOG DAY AND RECALCULATE GOAL =====
-  const logDayAndRecalculateGoal = () => {
-    const todayDateStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const buildHistoryEntryForToday = (): DayHistoryEntry => {
+    const todaysWorkouts = getWorkoutsForDate(todayDateKey);
+    const completedWorkouts = todaysWorkouts.filter(w => w.isCompleted).length;
+    const todaysWeighIn = (profile.weighIns || []).find(w => w.date.slice(0, 10) === todayDateKey);
+    const mealsCompleted = mealSlots.filter(slot => slot.completed).length;
+    const mealsPlanned = mealSlots.filter(slot => slot.templateId !== null).length;
+    const photosTaken = todayPhotoDay ? todayPhotoDay.positions.filter(p => p.imageUri).length : 0;
+    const photosRequired = todayPhotoDay ? todayPhotoDay.positions.length : 5;
 
-    const newSummary: DaySummary = {
-      date: todayDateStr,
-      calories: dailyTotals.calories,
-      protein: dailyTotals.protein,
+    return {
+      id: todayDateKey,
+      dateISO: new Date().toISOString(),
+      isDayComplete: true,
       steps: stepsToday,
-      didWorkout: workoutsComplete,
-      // Only include weight if today was a weigh-in day and it was completed
-      ...(weighInDueToday && weighInComplete && { weight: currentWeight }),
+      stepGoal: preferences.dailyStepGoal,
+      water: waterLiters,
+      waterGoal: preferences.dailyWaterGoal,
+      calories: dailyTotals.calories,
+      calorieGoal: preferences.dailyCalorieGoal,
+      protein: dailyTotals.protein,
+      proteinGoal: preferences.dailyProteinGoal,
+      workoutsCompleted: completedWorkouts,
+      mealsCompleted,
+      mealsPlanned,
+      didWeighIn: hasWeighedInToday,
+      weightLbs: hasWeighedInToday ? todaysWeighIn?.weightLbs : undefined,
+      didPhotos: hasCompletedPhotosToday,
+      photosTaken,
+      photosRequired,
+      cheatInfo: {
+        isCheatDay: cheatUsedToday,
+        daysUntilCheat: daysToCheatMeal,
+        cycleDay: Math.max(0, preferences.cheatMealIntervalDays - daysToCheatMeal),
+      },
+      weeksUntilGoalAtThatTime: profile.weeksUntilGoal ?? null,
     };
-
-    const updatedHistory = [...dayHistory, newSummary];
-    setDayHistory(updatedHistory);
-    recalculateEstimatedDaysToGoal(updatedHistory);
   };
 
   // ===== RESET DAILY STATE =====
@@ -429,7 +448,10 @@ export default function HomeScreen() {
     evaluateTodayForStreak();
 
     // 2. Log today and recalculate days/weeks to goal
-    logDayAndRecalculateGoal();
+    const entry = buildHistoryEntryForToday();
+    const updatedHistory = [...history.filter(h => h.id !== entry.id), entry].sort((a, b) => b.id.localeCompare(a.id));
+    upsertHistoryEntry(entry);
+    recalculateEstimatedDaysToGoal(updatedHistory);
 
     // 3. Reset all daily state for tomorrow
     resetDailyState();

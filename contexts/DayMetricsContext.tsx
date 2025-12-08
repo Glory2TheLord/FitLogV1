@@ -3,6 +3,44 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { useUser } from './UserContext';
 
+export type DayHistoryEntry = {
+  id: string; // date key, e.g. "2025-12-08"
+  dateISO: string; // full ISO string for that day
+  isDayComplete: boolean;
+
+  steps: number;
+  stepGoal: number;
+
+  water: number;
+  waterGoal: number;
+
+  calories: number;
+  calorieGoal: number;
+
+  protein: number;
+  proteinGoal: number;
+
+  workoutsCompleted: number;
+
+  mealsCompleted: number;
+  mealsPlanned?: number;
+
+  didWeighIn: boolean;
+  weightLbs?: number;
+
+  didPhotos: boolean;
+  photosTaken: number;
+  photosRequired: number;
+
+  cheatInfo?: {
+    isCheatDay: boolean;
+    daysUntilCheat?: number;
+    cycleDay?: number;
+  };
+
+  weeksUntilGoalAtThatTime?: number | null;
+};
+
 type DayMetricsContextValue = {
   stepsToday: number;
   waterLiters: number;
@@ -11,6 +49,11 @@ type DayMetricsContextValue = {
   setStepsToday: React.Dispatch<React.SetStateAction<number>>;
   setWaterLiters: React.Dispatch<React.SetStateAction<number>>;
   resetTodayTrackingToDefaults: () => void;
+  history: DayHistoryEntry[];
+  upsertHistoryEntry: (entry: DayHistoryEntry) => void;
+  deleteHistoryEntry: (id: string) => void;
+  getHistory: () => DayHistoryEntry[];
+  getHistoryEntryById: (id: string) => DayHistoryEntry | undefined;
 };
 
 const DayMetricsContext = createContext<DayMetricsContextValue | undefined>(undefined);
@@ -33,12 +76,14 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
 
   const [stepsToday, setStepsToday] = useState(0);
   const [waterLiters, setWaterLiters] = useState(0);
+  const [history, setHistory] = useState<DayHistoryEntry[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     if (!userId) {
       setStepsToday(0);
       setWaterLiters(0);
+      setHistory([]);
       setIsLoaded(true);
       return;
     }
@@ -52,6 +97,7 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
         if (isCancelled) return;
         if (stored) {
           const parsed = JSON.parse(stored);
+          setHistory(parsed?.history ?? []);
           if (parsed?.dateKey === todayKey) {
             setStepsToday(parsed.stepsToday ?? 0);
             setWaterLiters(parsed.waterLiters ?? 0);
@@ -62,11 +108,13 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
         } else {
           setStepsToday(0);
           setWaterLiters(0);
+          setHistory([]);
         }
       } catch (error) {
         console.error('Error loading day metrics', error);
         setStepsToday(0);
         setWaterLiters(0);
+        setHistory([]);
       } finally {
         if (!isCancelled) {
           setIsLoaded(true);
@@ -93,6 +141,7 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
             dateKey: todayKey,
             stepsToday,
             waterLiters,
+            history,
           })
         );
       } catch (error) {
@@ -100,7 +149,7 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
       }
     };
     saveData();
-  }, [stepsToday, waterLiters, isLoaded, userId, todayKey]);
+  }, [stepsToday, waterLiters, history, isLoaded, userId, todayKey]);
 
   const addSteps = (amount: number) => {
     if (!Number.isFinite(amount) || amount <= 0) return;
@@ -117,6 +166,22 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
     setWaterLiters(0);
   };
 
+  const upsertHistoryEntry = (entry: DayHistoryEntry) => {
+    setHistory(prev => {
+      const filtered = prev.filter(h => h.id !== entry.id);
+      const updated = [...filtered, entry];
+      return updated.sort((a, b) => b.id.localeCompare(a.id));
+    });
+  };
+
+  const deleteHistoryEntry = (id: string) => {
+    setHistory(prev => prev.filter(h => h.id !== id));
+  };
+
+  const getHistory = () => history;
+
+  const getHistoryEntryById = (id: string) => history.find(h => h.id === id);
+
   return (
     <DayMetricsContext.Provider
       value={{
@@ -127,6 +192,11 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
         setStepsToday,
         setWaterLiters,
         resetTodayTrackingToDefaults,
+        history,
+        upsertHistoryEntry,
+        deleteHistoryEntry,
+        getHistory,
+        getHistoryEntryById,
       }}
     >
       {children}
@@ -140,4 +210,9 @@ export function useDayMetrics() {
     throw new Error('useDayMetrics must be used within DayMetricsProvider');
   }
   return ctx;
+}
+
+export function useHistory() {
+  const { history } = useDayMetrics();
+  return history;
 }
