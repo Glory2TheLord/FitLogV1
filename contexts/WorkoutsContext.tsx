@@ -1,6 +1,7 @@
 import { getUserScopedKey } from '@/storage/userScopedKey';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { useDayMetrics } from './DayMetricsContext';
 import { ProgramDayId } from './ProgramDaysContext';
 import { useUser } from './UserContext';
 
@@ -67,6 +68,7 @@ const WorkoutsContext = createContext<WorkoutsContextValue | undefined>(undefine
 export function WorkoutsProvider({ children }: { children: ReactNode }) {
   const { currentUser } = useUser();
   const userId = currentUser?.id ?? null;
+  const { addHistoryEventForToday } = useDayMetrics();
   
   const [workoutsByDate, setWorkoutsByDate] = useState<WorkoutsByDate>({});
   const [workoutTemplates, setWorkoutTemplates] = useState<WorkoutTemplate[]>([]);
@@ -222,11 +224,36 @@ export function WorkoutsProvider({ children }: { children: ReactNode }) {
   const toggleWorkoutCompleted = (dateKey: string, workoutId: string) => {
     setWorkoutsByDate(prev => {
       const dateWorkouts = prev[dateKey] || [];
+      const target = dateWorkouts.find(w => w.id === workoutId);
+      const wasCompleted = target?.isCompleted ?? false;
+      const updatedForDate = dateWorkouts.map(w =>
+        w.id === workoutId ? { ...w, isCompleted: !w.isCompleted } : w
+      );
+      const updatedCompletedCount = updatedForDate.filter(w => w.isCompleted).length;
+
+      if (!wasCompleted) {
+        addHistoryEventForToday({
+          type: 'workoutLogged',
+          summary: target
+            ? `${target.name} — ${target.type === 'cardio' ? `${target.minutes ?? 0} min cardio` : `${target.sets ?? 0} sets`}`
+            : `Completed workout (${updatedCompletedCount} total today)`,
+          details: {
+            workoutsCompleted: updatedCompletedCount,
+            workoutId: target?.id,
+            workoutName: target?.name,
+            focus: target?.focusLabel,
+            sets: target?.sets,
+            repsPerSet: target?.reps ? [target.reps] : undefined,
+            weightPerSetLbs: target?.weight ? [target.weight] : undefined,
+            isCardio: target?.type === 'cardio',
+            durationMinutes: target?.minutes,
+          },
+        });
+      }
+
       return {
         ...prev,
-        [dateKey]: dateWorkouts.map(w =>
-          w.id === workoutId ? { ...w, isCompleted: !w.isCompleted } : w
-        ),
+        [dateKey]: updatedForDate,
       };
     });
   };

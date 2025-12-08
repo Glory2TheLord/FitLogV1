@@ -2,8 +2,10 @@
 // DEPRECATED: this file is no longer used.
 // The real UserContext lives in `contexts/UserContext.tsx`.
 // Do not import from this file.
-
-export { };
+// Export a no-op component to satisfy Expo Router's file scanning.
+export default function DeprecatedUserContextPlaceholder() {
+  return null;
+}
 
 
     import AsyncStorage from '@react-native-async-storage/async-storage';

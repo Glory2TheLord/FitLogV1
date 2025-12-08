@@ -3,6 +3,7 @@ import { getUserScopedKey } from '@/storage/userScopedKey';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { useUser } from './UserContext';
+import { useDayMetrics } from './DayMetricsContext';
 
 const BASE_STORAGE_KEY_PHOTO_DAYS = 'fitlog_photo_days_v1';
 
@@ -13,6 +14,14 @@ const DEFAULT_POSITIONS: PhotoPosition[] = [
   { id: 'back', label: 'Back' },
   { id: 'flex', label: 'Flex' },
 ];
+
+function getTodayKey() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 function normalizePhotoDay(day: PhotoDay): PhotoDay {
   const existingIds = day.positions.map(p => p.id);
@@ -35,6 +44,7 @@ const PhotoDayContext = createContext<PhotoDayContextType | undefined>(undefined
 export function PhotoDayProvider({ children }: { children: ReactNode }) {
   const { currentUser } = useUser();
   const userId = currentUser?.id ?? null;
+  const { addHistoryEventForToday } = useDayMetrics();
   
   const [photoDays, setPhotoDays] = useState<PhotoDay[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -104,9 +114,49 @@ export function PhotoDayProvider({ children }: { children: ReactNode }) {
   };
 
   const updatePhotoDay = (dateKey: string, updatedDay: PhotoDay) => {
-    setPhotoDays(prev =>
-      prev.map(day => (day.dateKey === dateKey ? updatedDay : day))
-    );
+    setPhotoDays(prev => {
+      const existing = prev.find(day => day.dateKey === dateKey);
+      const updatedList = prev.map(day => (day.dateKey === dateKey ? updatedDay : day));
+
+      const todayKey = getTodayKey();
+      if (dateKey === todayKey) {
+        const prevPositions = existing?.positions || [];
+        const newPositions = updatedDay.positions;
+
+        newPositions.forEach(pos => {
+          const prevPos = prevPositions.find(p => p.id === pos.id);
+          const wasCompleted = !!prevPos?.imageUri;
+          const nowCompleted = !!pos.imageUri;
+          if (!wasCompleted && nowCompleted) {
+            const photosTaken = newPositions.filter(p => p.imageUri).length;
+            addHistoryEventForToday({
+              type: 'photosSlotCompleted',
+              summary: `Completed progress photo: ${pos.label}`,
+              details: {
+                slot: pos.id,
+                photosTaken,
+                required: newPositions.length,
+              },
+            });
+          }
+        });
+
+        const prevAllDone = prevPositions.length > 0 && prevPositions.every(p => p.imageUri);
+        const nowAllDone = newPositions.length > 0 && newPositions.every(p => p.imageUri);
+        if (!prevAllDone && nowAllDone) {
+          addHistoryEventForToday({
+            type: 'photosAllCompleted',
+            summary: `Completed progress photos (${newPositions.filter(p => p.imageUri).length}/${newPositions.length})`,
+            details: {
+              photosTaken: newPositions.filter(p => p.imageUri).length,
+              required: newPositions.length,
+            },
+          });
+        }
+      }
+
+      return updatedList;
+    });
   };
 
   const removePhotoDay = (dateKey: string) => {

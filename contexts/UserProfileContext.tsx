@@ -2,6 +2,7 @@ import { getUserScopedKey } from '@/storage/userScopedKey';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { BaselineStats, FitLogUser, useUser } from './UserContext';
+import { useDayMetrics } from './DayMetricsContext';
 
 const BASE_STORAGE_KEY_USER_PROFILE = 'fitlog_user_profile_v1';
 
@@ -59,6 +60,7 @@ const DEFAULT_PROFILE: UserProfile = {
 export function UserProfileProvider({ children }: { children: ReactNode }) {
   const { currentUser, updateUserBaselineStats } = useUser();
   const userId = currentUser?.id ?? null;
+  const { addHistoryEventForToday } = useDayMetrics();
   
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -146,9 +148,41 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
   const recordWeighIn = (weightLbs: number) => {
     if (!Number.isFinite(weightLbs) || weightLbs <= 0) return;
     setProfile(prev => {
+      const weeksUntilGoalBefore = prev.weeksUntilGoal ?? null;
       const weighIns = [...(prev.weighIns || []), { date: new Date().toISOString(), weightLbs }];
       const limited = weighIns.slice(-WEIGH_IN_HISTORY_LIMIT);
       const weeksUntilGoal = calculateWeeksUntilGoal(limited, prev.goalWeight ?? null);
+
+      addHistoryEventForToday({
+        type: 'weighIn',
+        summary: `Weigh-in: ${weightLbs} lb`,
+        details: {
+          previousWeightLbs: prev.currentWeight ?? null,
+          weightLbs,
+          goalWeightLbs: prev.goalWeight ?? null,
+          weeksUntilGoalBefore,
+          weeksUntilGoalAfter: weeksUntilGoal ?? null,
+        },
+      });
+
+      const goalWeight = prev.goalWeight ?? null;
+      if (goalWeight !== null && prev.currentWeight !== null) {
+        const wasAbove = prev.currentWeight > goalWeight;
+        const reachedGoal =
+          wasAbove ? weightLbs <= goalWeight : weightLbs >= goalWeight;
+        if (reachedGoal) {
+          addHistoryEventForToday({
+            type: 'goalWeightReached',
+            summary: `Goal weight reached: ${weightLbs} lb`,
+            details: {
+              previousWeightLbs: prev.currentWeight,
+              weightLbs,
+              goalWeightLbs: goalWeight,
+            },
+          });
+        }
+      }
+
       return {
         ...prev,
         currentWeight: weightLbs,

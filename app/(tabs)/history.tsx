@@ -74,29 +74,36 @@ export default function HistoryScreen() {
             keyExtractor={item => item.id}
             contentContainerStyle={styles.listContent}
             renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.card}
-                activeOpacity={0.85}
-                onPress={() => {}}
-              >
-                <View style={styles.cardHeader}>
-                  <Text style={styles.cardDate}>{formatDate(item.id)}</Text>
-                  <TouchableOpacity onPress={() => openDeleteModal(item.id)}>
-                    <Text style={styles.deleteText}>Delete</Text>
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.cardStatus}>{item.isDayComplete ? 'Day complete' : 'Incomplete'}</Text>
-                <Text style={styles.cardSummary}>
-                  Steps: {item.steps}/{item.stepGoal} · Protein: {item.protein}/{item.proteinGoal}
-                </Text>
-                <Text style={styles.cardSubSummary}>
-                  Calories: {item.calories}/{item.calorieGoal} · Water: {item.water}L/{item.waterGoal}L
-                </Text>
-                <Text style={styles.cardMeta}>
-                  {item.didWeighIn ? 'Weigh-in ✔  ' : ''}
-                  {item.didPhotos ? 'Photos ✔' : ''}
-                </Text>
-              </TouchableOpacity>
+              <View style={styles.card}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(tabs)/history/[dayId]',
+                      params: { dayId: item.id },
+                    })
+                  }
+                  style={styles.cardBody}
+                >
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.cardDate}>{formatDate(item.id)}</Text>
+                  </View>
+                  <Text style={styles.cardStatus}>{item.isDayComplete ? 'Day complete' : 'Incomplete'}</Text>
+                  <Text style={styles.cardSummary}>
+                    Steps: {item.steps}/{item.stepGoal} · Protein: {item.protein}/{item.proteinGoal}
+                  </Text>
+                  <Text style={styles.cardSubSummary}>
+                    Calories: {item.calories}/{item.calorieGoal} · Water: {item.water}L/{item.waterGoal}L
+                  </Text>
+                  <Text style={styles.cardMeta}>
+                    {item.didWeighIn ? 'Weigh-in ✔  ' : ''}
+                    {item.didPhotos ? 'Photos ✔' : ''}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => openDeleteModal(item.id)} style={styles.deleteButtonInline}>
+                  <Text style={styles.deleteText}>Delete</Text>
+                </TouchableOpacity>
+              </View>
             )}
           />
         )}
@@ -191,6 +198,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     marginBottom: 12,
   },
+  cardBody: {
+    paddingBottom: 8,
+  },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -205,6 +215,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: ACCENT,
     fontWeight: '600',
+  },
+  deleteButtonInline: {
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
   },
   cardStatus: {
     marginTop: 6,

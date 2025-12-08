@@ -69,21 +69,21 @@ function AppShell() {
 export default function RootLayout() {
   return (
     <UserProvider>
-      <UserProfileProvider>
-        <ProgramDaysProvider>
-          <MealTrackingProvider>
-            <PreferencesProvider>
-              <DayMetricsProvider>
+      <DayMetricsProvider>
+        <UserProfileProvider>
+          <PreferencesProvider>
+            <ProgramDaysProvider>
+              <MealTrackingProvider>
                 <WorkoutsProvider>
                   <PhotoDayProvider>
                     <AppShell />
                   </PhotoDayProvider>
                 </WorkoutsProvider>
-              </DayMetricsProvider>
-            </PreferencesProvider>
-          </MealTrackingProvider>
-        </ProgramDaysProvider>
-      </UserProfileProvider>
+              </MealTrackingProvider>
+            </ProgramDaysProvider>
+          </PreferencesProvider>
+        </UserProfileProvider>
+      </DayMetricsProvider>
     </UserProvider>
   );
 }

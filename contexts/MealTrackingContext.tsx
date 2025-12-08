@@ -2,6 +2,8 @@ import { getUserScopedKey } from '@/storage/userScopedKey';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { useUser } from './UserContext';
+import { useDayMetrics } from './DayMetricsContext';
+import { usePreferences } from './PreferencesContext';
 
 const BASE_STORAGE_KEY_MEAL_TEMPLATES = 'fitlog_meal_templates_v1';
 const BASE_STORAGE_KEY_MEAL_SLOTS = 'fitlog_meal_slots_v1';
@@ -81,6 +83,8 @@ const DEFAULT_DAILY_TOTALS: DailyTotals = {
 export function MealTrackingProvider({ children }: { children: ReactNode }) {
   const { currentUser } = useUser();
   const userId = currentUser?.id ?? null;
+  const { addHistoryEventForToday } = useDayMetrics();
+  const { preferences } = usePreferences();
   
   const [mealTemplates, setMealTemplates] = useState<MealTemplate[]>(DEFAULT_MEAL_TEMPLATES);
   const [mealSlots, setMealSlots] = useState<MealSlot[]>(DEFAULT_MEAL_SLOTS);
@@ -184,6 +188,7 @@ export function MealTrackingProvider({ children }: { children: ReactNode }) {
     let totalCalories = 0;
     let totalProtein = 0;
     let hasCheat = false;
+    const cheatMeals: MealTemplate[] = [];
 
     mealSlots.forEach((slot) => {
       if (slot.completed && slot.templateId) {
@@ -193,15 +198,62 @@ export function MealTrackingProvider({ children }: { children: ReactNode }) {
           totalProtein += template.protein;
           if (template.category === 'cheat') {
             hasCheat = true;
+            cheatMeals.push(template);
           }
         }
       }
     });
 
-    setDailyTotals({
-      calories: totalCalories,
-      protein: totalProtein,
+    setDailyTotals(prev => {
+      const prevCalories = prev.calories;
+      const prevProtein = prev.protein;
+      const calorieGoal = preferences.dailyCalorieGoal;
+      const proteinGoal = preferences.dailyProteinGoal;
+
+      const reachedCalorieGoal = prevCalories < calorieGoal && totalCalories >= calorieGoal;
+      const reachedProteinGoal = prevProtein < proteinGoal && totalProtein >= proteinGoal;
+
+      if (reachedCalorieGoal) {
+        addHistoryEventForToday({
+          type: 'calorieGoalReached',
+          summary: `Reached calorie goal: ${totalCalories}/${calorieGoal}`,
+          details: {
+            previous: prevCalories,
+            current: totalCalories,
+            calorieGoal,
+          },
+        });
+      }
+
+      if (reachedProteinGoal) {
+        addHistoryEventForToday({
+          type: 'proteinGoalReached',
+          summary: `Reached protein goal: ${totalProtein}/${proteinGoal} g`,
+          details: {
+            previous: prevProtein,
+            current: totalProtein,
+            proteinGoal,
+          },
+        });
+      }
+
+      return {
+        calories: totalCalories,
+        protein: totalProtein,
+      };
     });
+    if (!cheatUsedToday && hasCheat) {
+      const firstCheat = cheatMeals[0];
+      addHistoryEventForToday({
+        type: 'cheatMealLogged',
+        summary: 'Cheat meal logged',
+        details: {
+          description: firstCheat?.name,
+          caloriesEstimate: firstCheat?.calories,
+        },
+      });
+    }
+
     setCheatUsedToday(hasCheat);
   };
 

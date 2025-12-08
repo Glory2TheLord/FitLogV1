@@ -3,6 +3,40 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { useUser } from './UserContext';
 
+export type DayHistoryEventType =
+  | 'markDayComplete'
+  | 'goalsChanged'
+  | 'weighIn'
+  | 'cheatCycleChanged'
+  | 'stepsLogged'
+  | 'stepGoalReached'
+  | 'calorieGoalReached'
+  | 'proteinGoalReached'
+  | 'goalWeightReached'
+  | 'mealCompleted'
+  | 'mealsAllCompleted'
+  | 'workoutLogged'
+  | 'photosSlotCompleted'
+  | 'photosAllCompleted'
+  | 'waterLogged'
+  | 'cheatMealLogged';
+
+export type DayHistoryEvent = {
+  id: string;
+  timestampISO: string;
+  type: DayHistoryEventType;
+  summary: string;
+  details?: Record<string, any>;
+};
+// Event detail conventions (not a strict type to keep flexibility):
+// - workoutLogged: { workoutId?, workoutName?, sets?, repsPerSet?, weightPerSetLbs?, isCardio?, durationMinutes?, stepsAddedFromWorkout?, stepsTotalAfter?, isPersonalBest?, previousBestInfo? }
+// - mealCompleted/mealsAllCompleted: { mealId?, mealName?, calories?, proteinGrams?, carbsGrams?, fatGrams?, mealsCompleted?, mealsPlanned?, totalCaloriesForDay?, totalProteinForDay? }
+// - photosSlotCompleted/photosAllCompleted: { slot?, photosTaken?, required? }
+// - stepsLogged/stepGoalReached: { previous?, current?, delta?, stepGoal?, source? }
+// - waterLogged: { previous?, current?, delta?, waterGoal? }
+// - cheatMealLogged: { description?, caloriesEstimate?, notes? }
+// - weighIn/goalWeightReached: { previousWeightLbs?, weightLbs?, goalWeightLbs?, weeksUntilGoalBefore?, weeksUntilGoalAfter? }
+
 export type DayHistoryEntry = {
   id: string; // date key, e.g. "2025-12-08"
   dateISO: string; // full ISO string for that day
@@ -39,6 +73,7 @@ export type DayHistoryEntry = {
   };
 
   weeksUntilGoalAtThatTime?: number | null;
+  events: DayHistoryEvent[];
 };
 
 type DayMetricsContextValue = {
@@ -52,6 +87,7 @@ type DayMetricsContextValue = {
   history: DayHistoryEntry[];
   upsertHistoryEntry: (entry: DayHistoryEntry) => void;
   deleteHistoryEntry: (id: string) => void;
+  addHistoryEventForToday: (event: Omit<DayHistoryEvent, 'id' | 'timestampISO'>) => void;
   getHistory: () => DayHistoryEntry[];
   getHistoryEntryById: (id: string) => DayHistoryEntry | undefined;
 };
@@ -169,13 +205,61 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
   const upsertHistoryEntry = (entry: DayHistoryEntry) => {
     setHistory(prev => {
       const filtered = prev.filter(h => h.id !== entry.id);
-      const updated = [...filtered, entry];
+      const updated = [...filtered, { ...entry, events: entry.events ?? [] }];
       return updated.sort((a, b) => b.id.localeCompare(a.id));
     });
   };
 
   const deleteHistoryEntry = (id: string) => {
     setHistory(prev => prev.filter(h => h.id !== id));
+  };
+
+  const addHistoryEventForToday = (event: Omit<DayHistoryEvent, 'id' | 'timestampISO'>) => {
+    const todayKey = getTodayKey();
+    const timestampISO = new Date().toISOString();
+    const newEvent: DayHistoryEvent = {
+      id: `${timestampISO}-${event.type}`,
+      timestampISO,
+      ...event,
+    };
+
+    setHistory(prev => {
+      const existing = prev.find(h => h.id === todayKey);
+      const baseEntry: DayHistoryEntry =
+        existing ??
+        {
+          id: todayKey,
+          dateISO: timestampISO,
+          isDayComplete: false,
+          steps: stepsToday,
+          stepGoal: 0,
+          water: waterLiters,
+          waterGoal: 0,
+          calories: 0,
+          calorieGoal: 0,
+          protein: 0,
+          proteinGoal: 0,
+          workoutsCompleted: 0,
+          mealsCompleted: 0,
+          mealsPlanned: 0,
+          didWeighIn: false,
+          weightLbs: undefined,
+          didPhotos: false,
+          photosTaken: 0,
+          photosRequired: 0,
+          cheatInfo: undefined,
+          weeksUntilGoalAtThatTime: null,
+          events: [],
+        };
+
+      const updatedEntry: DayHistoryEntry = {
+        ...baseEntry,
+        events: [...(baseEntry.events || []), newEvent],
+      };
+
+      const filtered = prev.filter(h => h.id !== todayKey);
+      return [...filtered, updatedEntry].sort((a, b) => b.id.localeCompare(a.id));
+    });
   };
 
   const getHistory = () => history;
@@ -195,6 +279,7 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
         history,
         upsertHistoryEntry,
         deleteHistoryEntry,
+        addHistoryEventForToday,
         getHistory,
         getHistoryEntryById,
       }}

@@ -2,6 +2,7 @@ import { getUserScopedKey } from '@/storage/userScopedKey';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { useUser } from './UserContext';
+import { useDayMetrics } from './DayMetricsContext';
 
 export type Preferences = {
   dailyStepGoal: number;
@@ -35,6 +36,7 @@ const DEFAULT_PREFERENCES: Preferences = {
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const { currentUser } = useUser();
   const userId = currentUser?.id ?? null;
+  const { addHistoryEventForToday } = useDayMetrics();
 
   const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -97,7 +99,36 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   }, [preferences, isLoaded, userId]);
 
   const updatePreferences = (prefs: Preferences) => {
-    setPreferences(prefs);
+    setPreferences(prev => {
+      const prevPrefs = prev;
+      const changes: Record<string, { from: number; to: number }> = {};
+
+      ([
+        'dailyStepGoal',
+        'dailyWaterGoal',
+        'dailyCalorieGoal',
+        'dailyProteinGoal',
+        'cheatMealIntervalDays',
+        'daysUntilWeighInInterval',
+        'daysUntilProgressPhotosInterval',
+      ] as (keyof Preferences)[]).forEach(key => {
+        if (prevPrefs[key] !== prefs[key]) {
+          changes[key] = { from: prevPrefs[key] as number, to: prefs[key] as number };
+        }
+      });
+
+      if (Object.keys(changes).length > 0) {
+        addHistoryEventForToday({
+          type: 'goalsChanged',
+          summary: 'Updated daily goals',
+          details: {
+            changes,
+          },
+        });
+      }
+
+      return prefs;
+    });
   };
 
   return (

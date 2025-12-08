@@ -41,6 +41,7 @@ export default function HomeScreen() {
     resetTodayTrackingToDefaults,
     history,
     upsertHistoryEntry,
+    addHistoryEventForToday,
   } = useDayMetrics();
   
   // Get meal tracking context
@@ -389,6 +390,8 @@ export default function HomeScreen() {
     const photosTaken = todayPhotoDay ? todayPhotoDay.positions.filter(p => p.imageUri).length : 0;
     const photosRequired = todayPhotoDay ? todayPhotoDay.positions.length : 5;
 
+    const existing = history.find(h => h.id === todayDateKey);
+
     return {
       id: todayDateKey,
       dateISO: new Date().toISOString(),
@@ -415,6 +418,7 @@ export default function HomeScreen() {
         cycleDay: Math.max(0, preferences.cheatMealIntervalDays - daysToCheatMeal),
       },
       weeksUntilGoalAtThatTime: profile.weeksUntilGoal ?? null,
+      events: existing?.events ?? [],
     };
   };
 
@@ -452,6 +456,18 @@ export default function HomeScreen() {
     const updatedHistory = [...history.filter(h => h.id !== entry.id), entry].sort((a, b) => b.id.localeCompare(a.id));
     upsertHistoryEntry(entry);
     recalculateEstimatedDaysToGoal(updatedHistory);
+    addHistoryEventForToday({
+      type: 'markDayComplete',
+      summary: 'Marked day complete',
+      details: {
+        steps: stepsToday,
+        calories: dailyTotals.calories,
+        protein: dailyTotals.protein,
+        water: waterLiters,
+        workoutsCompleted: entry.workoutsCompleted,
+        mealsCompleted: entry.mealsCompleted,
+      },
+    });
 
     // 3. Reset all daily state for tomorrow
     resetDailyState();
@@ -498,7 +514,32 @@ export default function HomeScreen() {
   const handleAddStepsConfirm = () => {
     const amount = Number(stepInput);
     if (Number.isFinite(amount) && amount > 0) {
+      const prevSteps = stepsToday;
+      const nextSteps = prevSteps + amount;
+      const stepGoal = preferences.dailyStepGoal;
       addSteps(amount);
+      addHistoryEventForToday({
+        type: 'stepsLogged',
+        summary: `Logged ${amount} steps (total ${nextSteps}/${stepGoal})`,
+        details: {
+          previous: prevSteps,
+          current: nextSteps,
+          stepGoal,
+          delta: amount,
+          source: 'manual',
+        },
+      });
+      if (prevSteps < stepGoal && nextSteps >= stepGoal) {
+        addHistoryEventForToday({
+          type: 'stepGoalReached',
+          summary: `Reached step goal: ${nextSteps}/${stepGoal}`,
+          details: {
+            previous: prevSteps,
+            current: nextSteps,
+            stepGoal,
+          },
+        });
+      }
     }
     closeAllDialogs();
   };
@@ -506,7 +547,20 @@ export default function HomeScreen() {
   const handleAddWaterConfirm = () => {
     const amount = Number(waterInput);
     if (Number.isFinite(amount) && amount > 0) {
+      const prevWater = waterLiters;
+      const nextWater = prevWater + amount;
+      const waterGoal = preferences.dailyWaterGoal;
       addWater(amount);
+      addHistoryEventForToday({
+        type: 'waterLogged',
+        summary: `Added ${amount} L water (total ${nextWater}/${waterGoal} L)`,
+        details: {
+          previous: prevWater,
+          current: nextWater,
+          delta: amount,
+          waterGoal,
+        },
+      });
     }
     closeAllDialogs();
   };

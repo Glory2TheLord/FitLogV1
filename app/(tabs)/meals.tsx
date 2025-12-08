@@ -1,5 +1,6 @@
 import FitLogHeader from '@/components/FitLogHeader';
 import { MealCategory, MealTemplate, useMealTracking } from '@/contexts/MealTrackingContext';
+import { useDayMetrics } from '@/contexts/DayMetricsContext';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -32,6 +33,7 @@ export default function MealsScreen() {
     setMealSlots,
     recalculateDailyTotals 
   } = useMealTracking();
+  const { addHistoryEventForToday } = useDayMetrics();
 
   const [showAddMealModal, setShowAddMealModal] = useState(false);
   const [currentEditingSlotId, setCurrentEditingSlotId] = useState<number | null>(null);
@@ -62,11 +64,63 @@ export default function MealsScreen() {
   };
 
   const handleToggleCompleted = (slotId: number) => {
-    setMealSlots((prev) =>
-      prev.map((slot) =>
+    setMealSlots((prev) => {
+      const target = prev.find((slot) => slot.id === slotId);
+      const wasCompleted = target?.completed ?? false;
+      const mealsCompletedPrev = prev.filter(s => s.completed).length;
+      const updated = prev.map((slot) =>
         slot.id === slotId ? { ...slot, completed: !slot.completed } : slot
-      )
-    );
+      );
+      const mealsCompleted = updated.filter(s => s.completed).length;
+      const mealsPlanned = updated.filter(s => s.templateId !== null).length;
+
+      if (!wasCompleted) {
+        const template = getTemplateById(target?.templateId ?? null);
+        addHistoryEventForToday({
+          type: 'mealCompleted',
+          summary: `${template?.name ?? 'Meal'} completed${template?.calories ? ` — ${template.calories} kcal` : ''}${template?.protein ? `, ${template.protein} g protein` : ''}`,
+          details: {
+            mealsCompleted,
+            mealsPlanned,
+            mealId: target?.id,
+            mealName: template?.name,
+            calories: template?.calories,
+            proteinGrams: template?.protein,
+          },
+        });
+      }
+
+      const allMealsDoneBefore = mealsPlanned > 0 ? mealsCompletedPrev >= mealsPlanned : false;
+      const allMealsDoneNow = mealsPlanned > 0 ? mealsCompleted >= mealsPlanned : false;
+
+      if (!allMealsDoneBefore && allMealsDoneNow) {
+        const totals = updated.reduce(
+          (acc, slot) => {
+            if (slot.completed && slot.templateId) {
+              const t = getTemplateById(slot.templateId);
+              if (t) {
+                acc.calories += t.calories;
+                acc.protein += t.protein;
+              }
+            }
+            return acc;
+          },
+          { calories: 0, protein: 0 }
+        );
+        addHistoryEventForToday({
+          type: 'mealsAllCompleted',
+          summary: `Completed all meals (${mealsCompleted}/${mealsPlanned})`,
+          details: {
+            mealsCompleted,
+            mealsPlanned,
+            totalCaloriesForDay: totals.calories,
+            totalProteinForDay: totals.protein,
+          },
+        });
+      }
+
+      return updated;
+    });
   };
 
   const handleClearSlot = (slotId: number) => {
