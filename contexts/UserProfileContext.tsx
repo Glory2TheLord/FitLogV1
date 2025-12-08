@@ -32,6 +32,7 @@ type UserProfileContextType = {
   updateBaselineStats: (profileId: string, stats: BaselineStats) => void;
   activeProfile: FitLogUser | null;
   recordWeighIn: (weightLbs: number) => void;
+  isWeighInRequiredOn: (date: Date, intervalDays: number) => boolean;
 };
 
 const UserProfileContext = createContext<UserProfileContextType | undefined>(undefined);
@@ -157,6 +158,20 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const isWeighInRequiredOn = (date: Date, intervalDays: number) => {
+    if (intervalDays < 0) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const target = new Date(today);
+    target.setDate(today.getDate() + (intervalDays || 0));
+
+    const input = new Date(date);
+    input.setHours(0, 0, 0, 0);
+
+    return input.getTime() === target.getTime();
+  };
+
   const updateBaselineStats = (profileId: string, stats: BaselineStats) => {
     updateUserBaselineStats(profileId, stats);
     const weightLb = Math.round(stats.weightKg * 2.20462 * 10) / 10;
@@ -205,6 +220,7 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
         recomputeMaintenance,
         updateBaselineStats,
         recordWeighIn,
+        isWeighInRequiredOn,
       }}
     >
       {children}

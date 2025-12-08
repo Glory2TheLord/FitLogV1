@@ -27,6 +27,7 @@ type PhotoDayContextType = {
   updatePhotoDay: (dateKey: string, updatedDay: PhotoDay) => void;
   removePhotoDay: (dateKey: string) => void;
   getNextProgressPhotoInfo: (intervalDays: number) => { nextDate: Date | null; daysUntil: number | null };
+  isProgressPhotosRequiredOn: (date: Date, intervalDays: number) => boolean;
 };
 
 const PhotoDayContext = createContext<PhotoDayContextType | undefined>(undefined);
@@ -137,8 +138,21 @@ export function PhotoDayProvider({ children }: { children: ReactNode }) {
     return { nextDate, daysUntil };
   };
 
+  const isProgressPhotosRequiredOn = (date: Date, intervalDays: number) => {
+    if (intervalDays < 0) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const input = new Date(date);
+    input.setHours(0, 0, 0, 0);
+
+    const target = new Date(today);
+    target.setDate(today.getDate() + (intervalDays || 0));
+
+    return input.getTime() === target.getTime();
+  };
+
   return (
-    <PhotoDayContext.Provider value={{ photoDays, setPhotoDays, addPhotoDay, updatePhotoDay, removePhotoDay, getNextProgressPhotoInfo }}>
+    <PhotoDayContext.Provider value={{ photoDays, setPhotoDays, addPhotoDay, updatePhotoDay, removePhotoDay, getNextProgressPhotoInfo, isProgressPhotosRequiredOn }}>
       {children}
     </PhotoDayContext.Provider>
   );

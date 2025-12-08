@@ -40,7 +40,7 @@ type DaySummary = {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { profile, activeProfile, recordWeighIn } = useUserProfile();
+  const { profile, activeProfile, recordWeighIn, isWeighInRequiredOn } = useUserProfile();
   const { stepsToday, setStepsToday, addSteps, waterLiters, setWaterLiters, addWater, resetTodayTrackingToDefaults } = useDayMetrics();
   
   // Get meal tracking context
@@ -56,7 +56,7 @@ export default function HomeScreen() {
     cheatUsedToday
   } = useMealTracking();
   const { preferences } = usePreferences();
-  const { photoDays } = usePhotoDays();
+  const { photoDays, isProgressPhotosRequiredOn } = usePhotoDays();
   
   // Get workouts context
   const {
@@ -112,7 +112,8 @@ export default function HomeScreen() {
   const daysSinceLastWeighIn = lastWeighInDate
     ? Math.floor((today.getTime() - new Date(lastWeighInDate).getTime()) / (1000 * 60 * 60 * 24))
     : Infinity;
-  const isWeighInRequiredToday = daysSinceLastWeighIn >= preferences.daysUntilWeighInInterval || !lastWeighInDate;
+  const isWeighInRequiredToday = isWeighInRequiredOn(today, preferences.daysUntilWeighInInterval);
+  const isWeighInRequiredTomorrow = isWeighInRequiredOn(tomorrowDate, preferences.daysUntilWeighInInterval);
 
   // Photos requirement/completion
   const todayPhotoDay = photoDays.find(day => day.dateKey === todayDateKey);
@@ -126,7 +127,8 @@ export default function HomeScreen() {
   const daysSinceLastPhotoDay = lastPhotoDate
     ? Math.floor((today.getTime() - new Date(lastPhotoDate).getTime()) / (1000 * 60 * 60 * 24))
     : Infinity;
-  const isProgressPhotosRequiredToday = daysSinceLastPhotoDay >= preferences.daysUntilProgressPhotosInterval || !lastPhotoDate;
+  const isProgressPhotosRequiredToday = isProgressPhotosRequiredOn(today, preferences.daysUntilProgressPhotosInterval);
+  const isProgressPhotosRequiredTomorrow = isProgressPhotosRequiredOn(tomorrowDate, preferences.daysUntilProgressPhotosInterval);
 
   // ===== STATUS COMPLETE STATES FOR MARK DAY ICONS =====
   // Steps complete: meets goal
@@ -732,25 +734,36 @@ export default function HomeScreen() {
             )}
 
             {/* ====== TODAY / TOMORROW FOCUS CARD ====== */}
-            <View style={styles.tilesSection}>
-              <View style={styles.tile}>
-                <View style={styles.focusRow}>
-                  {/* Today column */}
-                  <View style={styles.focusColumn}>
-                    <Text style={styles.focusLabel}>Today</Text>
-                    <Text style={styles.focusName}>{todayFocus.name}</Text>
-                  </View>
-
-                  {/* Tomorrow column */}
-                  <View style={[styles.focusColumn, styles.focusColumnRight]}>
-                    <Text style={styles.focusLabel}>Tomorrow</Text>
-                    <Text style={styles.focusName}>{tomorrowFocus.name}</Text>
-
-                    {isTomorrowSunday && (
-                      <Text style={styles.weighInText}>WEIGH-IN DAY</Text>
-                    )}
-                  </View>
+          <View style={styles.tilesSection}>
+            <View style={styles.tile}>
+              <View style={styles.focusRow}>
+                {/* Today column */}
+                <View style={styles.focusColumn}>
+                  <Text style={styles.focusLabel}>Today</Text>
+                  <Text style={styles.focusName}>{todayFocus.name}</Text>
+                  {(isWeighInRequiredToday || isProgressPhotosRequiredToday) && (
+                    <Text style={styles.focusMetaText}>
+                      {isWeighInRequiredToday && 'Weigh-in day'}
+                      {isWeighInRequiredToday && isProgressPhotosRequiredToday && ' · '}
+                      {isProgressPhotosRequiredToday && 'Photo day'}
+                    </Text>
+                  )}
                 </View>
+
+                {/* Tomorrow column */}
+                <View style={[styles.focusColumn, styles.focusColumnRight]}>
+                  <Text style={styles.focusLabel}>Tomorrow</Text>
+                  <Text style={styles.focusName}>{tomorrowFocus.name}</Text>
+
+                  {(isWeighInRequiredTomorrow || isProgressPhotosRequiredTomorrow) && (
+                    <Text style={styles.focusMetaText}>
+                      {isWeighInRequiredTomorrow && 'Weigh-in day'}
+                      {isWeighInRequiredTomorrow && isProgressPhotosRequiredTomorrow && ' · '}
+                      {isProgressPhotosRequiredTomorrow && 'Photo day'}
+                    </Text>
+                  )}
+                </View>
+              </View>
 
                 {/* Streak line under the split info, "9 Day Streak!!" style */}
                 <Text style={styles.streakText}>
@@ -1133,6 +1146,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
+  },
+  focusMetaText: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '600',
   },
   streakText: {
     marginTop: 8,
