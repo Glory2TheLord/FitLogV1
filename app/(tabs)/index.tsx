@@ -40,7 +40,7 @@ type DaySummary = {
 export default function HomeScreen() {
   const router = useRouter();
   const { profile, activeProfile, recordWeighIn } = useUserProfile();
-  const { stepsToday, setStepsToday, addSteps, waterLiters, setWaterLiters, addWater } = useDayMetrics();
+  const { stepsToday, setStepsToday, addSteps, waterLiters, setWaterLiters, addWater, resetTodayTrackingToDefaults } = useDayMetrics();
   
   // Get meal tracking context
   const {
@@ -57,7 +57,11 @@ export default function HomeScreen() {
   const { preferences } = usePreferences();
   
   // Get workouts context
-  const { hasCompletedWorkoutsForDate } = useWorkouts();
+  const {
+    getWorkoutsForDate,
+    hasCompletedWorkoutsForDate,
+    clearWorkoutsForDate,
+  } = useWorkouts();
   
   const today = new Date();
   const datePart = today
@@ -83,23 +87,23 @@ export default function HomeScreen() {
   // ===== WATER TRACKER STATE (manual for now) =====
   // waterLiters now comes from context
 
-  // ===== DERIVED VALUES FROM MEAL TRACKING =====
+  // ===== DERIVED VALUES FROM MEAL TRACKING & GOALS =====
   // dailyTotals comes from context
+  const hasMetStepGoal = stepsToday >= preferences.dailyStepGoal;
+  const hasMetCalorieGoal = dailyTotals.calories > 0 && dailyTotals.calories <= preferences.dailyCalorieGoal;
+  const hasMetProteinGoal = dailyTotals.protein >= preferences.dailyProteinGoal;
   // Calculate days to cheat meal using preference interval and eating streak
   const daysToCheatMeal = Math.max(0, preferences.cheatMealIntervalDays - goodEatingStreak);
 
   // ===== STATUS COMPLETE STATES FOR MARK DAY ICONS =====
-  // Steps complete: 10k steps or more
-  const stepsComplete = stepsToday >= 10000;
+  // Steps complete: meets goal
+  const stepsComplete = hasMetStepGoal;
 
   // Meals complete: meets calorie/protein goals, all selected slots completed, no cheat
   const mealsComplete = (() => {
-    const meetsCalories = dailyTotals.calories > 0 && dailyTotals.calories <= preferences.dailyCalorieGoal;
+    const meetsCalories = dailyTotals.calories >= preferences.dailyCalorieGoal;
     const meetsProtein = dailyTotals.protein >= preferences.dailyProteinGoal;
-    const allSelectedSlotsCompleted = mealSlots.every(slot => {
-      if (!slot.templateId) return true; // empty slot is fine
-      return slot.completed === true;
-    });
+    const allSelectedSlotsCompleted = mealSlots.every(slot => slot.completed === true);
     return meetsCalories && meetsProtein && allSelectedSlotsCompleted && !cheatUsedToday;
   })();
 
@@ -188,10 +192,12 @@ export default function HomeScreen() {
   const weighInDueToday = ((daysSinceStart + 1) % 10) === 0;
 
   // ===== GATE: CAN MARK DAY COMPLETE =====
+  const atLeastOneWorkoutCompleted = getWorkoutsForDate(todayDateKey).some(w => w.isCompleted);
+
   const canMarkDayComplete =
     stepsComplete &&
     mealsComplete &&
-    workoutsComplete &&
+    atLeastOneWorkoutCompleted &&
     (!photosDueToday || photosComplete) &&
     (!weighInDueToday || weighInComplete);
 
@@ -263,7 +269,7 @@ export default function HomeScreen() {
   const handleDevReset = () => {
     Alert.alert(
       'Reset cheat-meal progress?',
-      "This will reset your good eating streak, days-to-cheat counter, and clear today's logged slots. This is intended for development/testing only.",
+      "This will reset your good eating streak, days-to-cheat counter, and clear today's logged slots and trackers. This is intended for development/testing only.",
       [
         {
           text: 'Cancel',
@@ -283,6 +289,8 @@ export default function HomeScreen() {
                 completed: false,
               }))
             );
+            resetTodayTrackingToDefaults();
+            clearWorkoutsForDate(todayDateKey);
           },
         },
       ]
@@ -660,7 +668,7 @@ export default function HomeScreen() {
                 <FontAwesome5
                   name="dumbbell"
                   size={16}
-                  color={workoutsComplete ? '#16a34a' : '#d1d5db'}
+                  color={atLeastOneWorkoutCompleted ? '#16a34a' : '#d1d5db'}
                   style={styles.statusIcon}
                 />
                 
@@ -675,6 +683,11 @@ export default function HomeScreen() {
                 )}
               </View>
             </TouchableOpacity>
+            {!canMarkDayComplete && (
+              <Text style={styles.markDayHint}>
+                Complete steps, calories, protein, meals, and at least one workout to mark the day complete.
+              </Text>
+            )}
 
             {/* ====== DEV RESET BUTTON ====== */}
             {__DEV__ && (
@@ -1327,5 +1340,12 @@ const styles = StyleSheet.create({
     color: '#4B5563',
     fontSize: 15,
     fontWeight: '700',
+  },
+  markDayHint: {
+    marginTop: 4,
+    color: '#6b7280',
+    fontSize: 11,
+    lineHeight: 14,
+    textAlign: 'center',
   },
 });

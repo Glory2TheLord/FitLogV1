@@ -10,6 +10,7 @@ type DayMetricsContextValue = {
   addWater: (amount: number) => void;
   setStepsToday: React.Dispatch<React.SetStateAction<number>>;
   setWaterLiters: React.Dispatch<React.SetStateAction<number>>;
+  resetTodayTrackingToDefaults: () => void;
 };
 
 const DayMetricsContext = createContext<DayMetricsContextValue | undefined>(undefined);
@@ -111,6 +112,11 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
     setWaterLiters(prev => prev + amount);
   };
 
+  const resetTodayTrackingToDefaults = () => {
+    setStepsToday(0);
+    setWaterLiters(0);
+  };
+
   return (
     <DayMetricsContext.Provider
       value={{
@@ -120,6 +126,7 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
         addWater,
         setStepsToday,
         setWaterLiters,
+        resetTodayTrackingToDefaults,
       }}
     >
       {children}
