@@ -43,6 +43,7 @@ export default function SettingsScreen() {
       dailyStepGoal: Math.round(steps),
       dailyWaterGoal: water,
       dailyCalorieGoal: Math.round(cals),
+      dailyProteinGoal: preferences.dailyProteinGoal,
     });
     setShowPrefsModal(false);
   };

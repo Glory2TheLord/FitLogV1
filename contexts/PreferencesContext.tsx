@@ -7,6 +7,7 @@ export type Preferences = {
   dailyStepGoal: number;
   dailyWaterGoal: number; // liters
   dailyCalorieGoal: number; // kcal
+  dailyProteinGoal: number; // grams
 };
 
 type PreferencesContextValue = {
@@ -22,6 +23,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   dailyStepGoal: 10000,
   dailyWaterGoal: 3, // liters
   dailyCalorieGoal: 1600,
+  dailyProteinGoal: 165,
 };
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {

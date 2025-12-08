@@ -1,8 +1,9 @@
 import FitLogHeader from '@/components/FitLogHeader';
-import { CALORIE_GOAL, PROTEIN_GOAL, useMealTracking } from '@/contexts/MealTrackingContext';
+import { useMealTracking } from '@/contexts/MealTrackingContext';
 import { useProgramDays } from '@/contexts/ProgramDaysContext';
 import { useUserProfile } from '@/contexts/UserProfileContext';
 import { useDayMetrics } from '@/contexts/DayMetricsContext';
+import { usePreferences } from '@/contexts/PreferencesContext';
 import { useWorkouts } from '@/contexts/WorkoutsContext';
 import {
     Feather,
@@ -42,9 +43,9 @@ export default function HomeScreen() {
   const { stepsToday, setStepsToday, addSteps, waterLiters, setWaterLiters, addWater } = useDayMetrics();
   
   // Get meal tracking context
-  const { 
-    dailyTotals, 
-    goodEatingStreak, 
+  const {
+    dailyTotals,
+    goodEatingStreak,
     evaluateTodayForStreak,
     setGoodEatingStreak,
     setCheatUsedToday,
@@ -53,6 +54,7 @@ export default function HomeScreen() {
     mealSlots,
     cheatUsedToday
   } = useMealTracking();
+  const { preferences } = usePreferences();
   
   // Get workouts context
   const { hasCompletedWorkoutsForDate } = useWorkouts();
@@ -95,8 +97,8 @@ export default function HomeScreen() {
 
   // Meals complete: meets calorie/protein goals, all selected slots completed, no cheat
   const mealsComplete = (() => {
-    const meetsCalories = dailyTotals.calories > 0 && dailyTotals.calories <= CALORIE_GOAL;
-    const meetsProtein = dailyTotals.protein >= PROTEIN_GOAL;
+    const meetsCalories = dailyTotals.calories > 0 && dailyTotals.calories <= preferences.dailyCalorieGoal;
+    const meetsProtein = dailyTotals.protein >= preferences.dailyProteinGoal;
     const allSelectedSlotsCompleted = mealSlots.every(slot => {
       if (!slot.templateId) return true; // empty slot is fine
       return slot.completed === true;
@@ -471,14 +473,19 @@ export default function HomeScreen() {
                     size={20}
                     style={styles.trackerIcon}
                   />
-                  <Text
-                    style={styles.trackerNumber}
-                    adjustsFontSizeToFit
-                    numberOfLines={1}
-                    minimumFontScale={0.7}
-                  >
-                    {formattedSteps}
-                  </Text>
+                  <View style={styles.trackerValueRow}>
+                    {stepsToday > preferences.dailyStepGoal && (
+                      <Text style={styles.goalPlusGreen}>+</Text>
+                    )}
+                    <Text
+                      style={styles.trackerNumber}
+                      adjustsFontSizeToFit
+                      numberOfLines={1}
+                      minimumFontScale={0.7}
+                    >
+                      {formattedSteps}
+                    </Text>
+                  </View>
                 </View>
 
                 {/* Water */}
@@ -525,14 +532,19 @@ export default function HomeScreen() {
                     size={20}
                     style={styles.trackerIcon}
                   />
-                  <Text
-                    style={styles.trackerNumber}
-                    adjustsFontSizeToFit
-                    numberOfLines={1}
-                    minimumFontScale={0.7}
-                  >
-                    {dailyTotals.calories}
-                  </Text>
+                  <View style={styles.trackerValueRow}>
+                    {dailyTotals.calories > preferences.dailyCalorieGoal && (
+                      <Text style={styles.goalPlusRed}>+</Text>
+                    )}
+                    <Text
+                      style={styles.trackerNumber}
+                      adjustsFontSizeToFit
+                      numberOfLines={1}
+                      minimumFontScale={0.7}
+                    >
+                      {dailyTotals.calories}
+                    </Text>
+                  </View>
                   <Text style={styles.trackerLabel}>cal</Text>
                 </View>
 
@@ -543,14 +555,19 @@ export default function HomeScreen() {
                     size={20}
                     style={styles.trackerIcon}
                   />
-                  <Text
-                    style={styles.trackerNumber}
-                    adjustsFontSizeToFit
-                    numberOfLines={1}
-                    minimumFontScale={0.7}
-                  >
-                    {dailyTotals.protein}
-                  </Text>
+                  <View style={styles.trackerValueRow}>
+                    {dailyTotals.protein > preferences.dailyProteinGoal && (
+                      <Text style={styles.goalPlusRed}>+</Text>
+                    )}
+                    <Text
+                      style={styles.trackerNumber}
+                      adjustsFontSizeToFit
+                      numberOfLines={1}
+                      minimumFontScale={0.7}
+                    >
+                      {dailyTotals.protein}
+                    </Text>
+                  </View>
                   <Text style={styles.trackerLabel}>g</Text>
                 </View>
 
@@ -925,11 +942,26 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     marginBottom: 4,
   },
+  trackerValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   trackerNumber: {
     color: '#FFFFFF',
     fontSize: 17,
     fontWeight: '800',
     letterSpacing: 0.3,
+  },
+  goalPlusGreen: {
+    color: '#2ecc71',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  goalPlusRed: {
+    color: '#e74c3c',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   trackerLabel: {
     color: '#FFFFFF',
