@@ -1,12 +1,15 @@
 import BaselineStatsModal from '@/components/BaselineStatsModal';
 import { useUser } from '@/contexts/UserContext';
 import { useUserProfile } from '@/contexts/UserProfileContext';
+import { usePreferences } from '@/contexts/PreferencesContext';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
+    Modal,
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
@@ -19,6 +22,30 @@ export default function SettingsScreen() {
   const { profile } = useUserProfile();
   const { currentUser, clearCurrentUser } = useUser();
   const [showBaselineModal, setShowBaselineModal] = useState(false);
+  const { preferences, updatePreferences } = usePreferences();
+  const [showPrefsModal, setShowPrefsModal] = useState(false);
+  const [stepGoal, setStepGoal] = useState(preferences.dailyStepGoal.toString());
+  const [waterGoal, setWaterGoal] = useState(preferences.dailyWaterGoal.toString());
+  const [calorieGoal, setCalorieGoal] = useState(preferences.dailyCalorieGoal.toString());
+
+  const handleSavePrefs = () => {
+    const steps = Number(stepGoal);
+    const water = Number(waterGoal);
+    const cals = Number(calorieGoal);
+    if (
+      !Number.isFinite(steps) || steps <= 0 ||
+      !Number.isFinite(water) || water <= 0 ||
+      !Number.isFinite(cals) || cals <= 0
+    ) {
+      return;
+    }
+    updatePreferences({
+      dailyStepGoal: Math.round(steps),
+      dailyWaterGoal: water,
+      dailyCalorieGoal: Math.round(cals),
+    });
+    setShowPrefsModal(false);
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
@@ -39,6 +66,17 @@ export default function SettingsScreen() {
             onPress={() => setShowBaselineModal(true)}
           >
             <Text style={styles.editButtonText}>Edit Baseline Stats</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.editButton, styles.prefsButton]}
+            onPress={() => {
+              setStepGoal(preferences.dailyStepGoal.toString());
+              setWaterGoal(preferences.dailyWaterGoal.toString());
+              setCalorieGoal(preferences.dailyCalorieGoal.toString());
+              setShowPrefsModal(true);
+            }}
+          >
+            <Text style={styles.editButtonText}>Edit Preferences</Text>
           </TouchableOpacity>
           
           {/* Show current stats summary */}
@@ -108,6 +146,56 @@ export default function SettingsScreen() {
         visible={showBaselineModal} 
         onClose={() => setShowBaselineModal(false)}
       />
+
+      {/* Preferences Modal */}
+      <Modal visible={showPrefsModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Edit preferences</Text>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Daily steps goal</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                value={stepGoal}
+                onChangeText={setStepGoal}
+                placeholder="e.g. 10000"
+                placeholderTextColor="#999"
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Daily water goal (L)</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                value={waterGoal}
+                onChangeText={setWaterGoal}
+                placeholder="e.g. 3"
+                placeholderTextColor="#999"
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Daily calories goal</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                value={calorieGoal}
+                onChangeText={setCalorieGoal}
+                placeholder="e.g. 1600"
+                placeholderTextColor="#999"
+              />
+            </View>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.modalButtonSecondary} onPress={() => setShowPrefsModal(false)}>
+                <Text style={styles.modalButtonSecondaryText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalButtonPrimary} onPress={handleSavePrefs}>
+                <Text style={styles.modalButtonPrimaryText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -239,5 +327,80 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#666',
+  },
+  input: {
+    borderWidth: 2,
+    borderColor: '#E5E5E5',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: '#1a1a1a',
+    backgroundColor: '#FAFAFA',
+  },
+  prefsButton: {
+    marginTop: 8,
+    backgroundColor: '#0F172A',
+    borderColor: '#000',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#FFFDF5',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: '#000000',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 6,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1a1a1a',
+    marginBottom: 12,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  modalButtonPrimary: {
+    flex: 1,
+    backgroundColor: ACCENT,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#000',
+  },
+  modalButtonPrimaryText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  modalButtonSecondary: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E5E5E5',
+  },
+  modalButtonSecondaryText: {
+    color: '#4B5563',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });
