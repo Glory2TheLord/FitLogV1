@@ -48,7 +48,11 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         const stored = await AsyncStorage.getItem(key);
         if (isCancelled) return;
         if (stored) {
-          setPreferences(JSON.parse(stored));
+          const parsed = JSON.parse(stored);
+          setPreferences({
+            ...DEFAULT_PREFERENCES,
+            ...parsed,
+          });
         } else {
           setPreferences(DEFAULT_PREFERENCES);
         }

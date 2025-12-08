@@ -24,18 +24,21 @@ export default function SettingsScreen() {
   const [showBaselineModal, setShowBaselineModal] = useState(false);
   const { preferences, updatePreferences } = usePreferences();
   const [showPrefsModal, setShowPrefsModal] = useState(false);
-  const [stepGoal, setStepGoal] = useState(preferences.dailyStepGoal.toString());
-  const [waterGoal, setWaterGoal] = useState(preferences.dailyWaterGoal.toString());
-  const [calorieGoal, setCalorieGoal] = useState(preferences.dailyCalorieGoal.toString());
+  const [stepGoal, setStepGoal] = useState((preferences.dailyStepGoal ?? 0).toString());
+  const [waterGoal, setWaterGoal] = useState((preferences.dailyWaterGoal ?? 0).toString());
+  const [calorieGoal, setCalorieGoal] = useState((preferences.dailyCalorieGoal ?? 0).toString());
+  const [proteinGoal, setProteinGoal] = useState((preferences.dailyProteinGoal ?? 0).toString());
 
   const handleSavePrefs = () => {
     const steps = Number(stepGoal);
     const water = Number(waterGoal);
     const cals = Number(calorieGoal);
+    const protein = Number(proteinGoal);
     if (
       !Number.isFinite(steps) || steps <= 0 ||
       !Number.isFinite(water) || water <= 0 ||
-      !Number.isFinite(cals) || cals <= 0
+      !Number.isFinite(cals) || cals <= 0 ||
+      !Number.isFinite(protein) || protein <= 0
     ) {
       return;
     }
@@ -43,7 +46,7 @@ export default function SettingsScreen() {
       dailyStepGoal: Math.round(steps),
       dailyWaterGoal: water,
       dailyCalorieGoal: Math.round(cals),
-      dailyProteinGoal: preferences.dailyProteinGoal,
+      dailyProteinGoal: Math.round(protein),
     });
     setShowPrefsModal(false);
   };
@@ -52,10 +55,17 @@ export default function SettingsScreen() {
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.settingsTitle}>Settings</Text>
+        <View style={styles.settingsHeader}>
+          <View style={styles.headerSide}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+              <Text style={styles.backText}>{"< Back"}</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.headerCenter}>
+            <Text style={styles.settingsTitle}>Settings</Text>
+          </View>
+          <View style={styles.headerSide} />
+        </View>
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
@@ -71,13 +81,14 @@ export default function SettingsScreen() {
           <TouchableOpacity
             style={[styles.editButton, styles.prefsButton]}
             onPress={() => {
-              setStepGoal(preferences.dailyStepGoal.toString());
-              setWaterGoal(preferences.dailyWaterGoal.toString());
-              setCalorieGoal(preferences.dailyCalorieGoal.toString());
+              setStepGoal((preferences.dailyStepGoal ?? 0).toString());
+              setWaterGoal((preferences.dailyWaterGoal ?? 0).toString());
+              setCalorieGoal((preferences.dailyCalorieGoal ?? 0).toString());
+              setProteinGoal((preferences.dailyProteinGoal ?? 0).toString());
               setShowPrefsModal(true);
             }}
           >
-            <Text style={styles.editButtonText}>Edit Preferences</Text>
+            <Text style={styles.editButtonText}>Edit Goals</Text>
           </TouchableOpacity>
           
           {/* Show current stats summary */}
@@ -96,7 +107,14 @@ export default function SettingsScreen() {
               {profile.heightCm && (
                 <View style={styles.summaryRow}>
                   <Text style={styles.summaryLabel}>Height:</Text>
-                  <Text style={styles.summaryValue}>{profile.heightCm} cm</Text>
+                  <Text style={styles.summaryValue}>
+                    {(() => {
+                      const totalInches = Math.round(profile.heightCm / 2.54);
+                      const feet = Math.floor(totalInches / 12);
+                      const inches = totalInches % 12;
+                      return `${feet} ft ${inches} in`;
+                    })()}
+                  </Text>
                 </View>
               )}
               {profile.currentWeight && (
@@ -152,7 +170,7 @@ export default function SettingsScreen() {
       <Modal visible={showPrefsModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Edit preferences</Text>
+            <Text style={styles.modalTitle}>Edit goals</Text>
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Daily steps goal</Text>
               <TextInput
@@ -186,6 +204,17 @@ export default function SettingsScreen() {
                 placeholderTextColor="#999"
               />
             </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Daily protein goal (g)</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                value={proteinGoal}
+                onChangeText={setProteinGoal}
+                placeholder="e.g. 165"
+                placeholderTextColor="#999"
+              />
+            </View>
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.modalButtonSecondary} onPress={() => setShowPrefsModal(false)}>
                 <Text style={styles.modalButtonSecondaryText}>Cancel</Text>
@@ -214,8 +243,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',
   },
+  settingsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerSide: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   backButton: {
-    marginBottom: 8,
+    paddingVertical: 4,
   },
   backText: {
     fontSize: 16,
