@@ -7,6 +7,7 @@ import { useUser } from './UserContext';
 
 const BASE_STORAGE_KEY_WORKOUTS = 'fitlog_workouts_v1';
 const BASE_STORAGE_KEY_TEMPLATES = 'fitlog_workout_templates_v1';
+const BASE_STORAGE_KEY_CUSTOM = 'fitlog_custom_workouts_v1';
 
 export type WorkoutType = 'cardio' | 'strength' | 'accessory' | 'other';
 
@@ -14,12 +15,17 @@ export type WorkoutTemplate = {
   id: string;
   name: string;
   type: WorkoutType;
+  description?: string;
+  steps?: number;
   defaultMinutes?: number;
   defaultSets?: number;
   defaultReps?: number;
   defaultWeight?: number;
+  defaultSteps?: number;
   programDayIds: ProgramDayId[];
 };
+
+export type CustomWorkout = WorkoutTemplate;
 
 export type WorkoutEntry = {
   id: string;
@@ -33,6 +39,7 @@ export type WorkoutEntry = {
   sets?: number;
   reps?: number;
   weight?: number;
+  steps?: number;
   notes?: string;
   isCompleted: boolean;
   createdAt: string;
@@ -45,17 +52,22 @@ export type WorkoutsByDate = {
 type WorkoutsContextValue = {
   workoutsByDate: WorkoutsByDate;
   workoutTemplates: WorkoutTemplate[];
+  customWorkouts: CustomWorkout[];
   addWorkout: (entry: Omit<WorkoutEntry, 'id' | 'createdAt' | 'isCompleted'>) => void;
   updateWorkout: (
     dateKey: string,
     workoutId: string,
-    updates: Partial<Pick<WorkoutEntry, 'name' | 'type' | 'minutes' | 'sets' | 'reps' | 'weight' | 'notes'>>
+    updates: Partial<Pick<WorkoutEntry, 'name' | 'type' | 'minutes' | 'sets' | 'reps' | 'weight' | 'notes' | 'steps'>>
   ) => void;
   deleteWorkout: (dateKey: string, workoutId: string) => void;
   toggleWorkoutCompleted: (dateKey: string, workoutId: string) => void;
   addWorkoutTemplate: (template: Omit<WorkoutTemplate, 'id'>) => void;
   updateWorkoutTemplate: (templateId: string, updates: Partial<Omit<WorkoutTemplate, 'id'>>) => void;
   deleteWorkoutTemplate: (templateId: string) => void;
+  addCustomWorkout: (workout: Omit<CustomWorkout, 'id'>) => CustomWorkout;
+  updateCustomWorkout: (id: string, updates: Partial<CustomWorkout>) => void;
+  deleteCustomWorkout: (id: string) => void;
+  getCustomWorkouts: () => CustomWorkout[];
   getWorkoutsForDate: (dateKey: string) => WorkoutEntry[];
   hasCompletedWorkoutsForDate: (dateKey: string) => boolean;
   hasWorkoutsForDate: (dateKey: string) => boolean;
@@ -68,10 +80,11 @@ const WorkoutsContext = createContext<WorkoutsContextValue | undefined>(undefine
 export function WorkoutsProvider({ children }: { children: ReactNode }) {
   const { currentUser } = useUser();
   const userId = currentUser?.id ?? null;
-  const { addHistoryEventForToday } = useDayMetrics();
+  const { addHistoryEventForToday, addSteps, stepsToday } = useDayMetrics();
   
   const [workoutsByDate, setWorkoutsByDate] = useState<WorkoutsByDate>({});
   const [workoutTemplates, setWorkoutTemplates] = useState<WorkoutTemplate[]>([]);
+  const [customWorkouts, setCustomWorkouts] = useState<CustomWorkout[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Load from AsyncStorage when user changes
@@ -91,9 +104,10 @@ export function WorkoutsProvider({ children }: { children: ReactNode }) {
         const workoutsKey = getUserScopedKey(BASE_STORAGE_KEY_WORKOUTS, userId);
         const templatesKey = getUserScopedKey(BASE_STORAGE_KEY_TEMPLATES, userId);
         
-        const [workoutsStored, templatesStored] = await Promise.all([
+        const [workoutsStored, templatesStored, customStored] = await Promise.all([
           AsyncStorage.getItem(workoutsKey),
           AsyncStorage.getItem(templatesKey),
+          AsyncStorage.getItem(getUserScopedKey(BASE_STORAGE_KEY_CUSTOM, userId)),
         ]);
 
         if (isCancelled) return;
@@ -110,16 +124,30 @@ export function WorkoutsProvider({ children }: { children: ReactNode }) {
           const migratedTemplates = parsed.map((t: WorkoutTemplate) => ({
             ...t,
             programDayIds: t.programDayIds || [],
+            defaultSteps: t.defaultSteps ?? 0,
           }));
           setWorkoutTemplates(migratedTemplates);
         } else {
           setWorkoutTemplates([]);
+        }
+
+        if (customStored) {
+          const parsedCustom = JSON.parse(customStored) as CustomWorkout[];
+          const migratedCustom = parsedCustom.map(c => ({
+            ...c,
+            programDayIds: c.programDayIds || [],
+            defaultSteps: c.defaultSteps ?? c.steps ?? 0,
+          }));
+          setCustomWorkouts(migratedCustom);
+        } else {
+          setCustomWorkouts([]);
         }
       } catch (error) {
         console.error('Error loading workout data for user', userId, error);
         if (!isCancelled) {
           setWorkoutsByDate({});
           setWorkoutTemplates([]);
+          setCustomWorkouts([]);
         }
       } finally {
         if (!isCancelled) {
@@ -166,6 +194,20 @@ export function WorkoutsProvider({ children }: { children: ReactNode }) {
     saveTemplates();
   }, [workoutTemplates, isLoaded, userId]);
 
+  // Save custom workouts to AsyncStorage
+  useEffect(() => {
+    if (!isLoaded || !userId) return;
+    const saveCustom = async () => {
+      try {
+        const key = getUserScopedKey(BASE_STORAGE_KEY_CUSTOM, userId);
+        await AsyncStorage.setItem(key, JSON.stringify(customWorkouts));
+      } catch (error) {
+        console.error('Error saving custom workouts for user', userId, error);
+      }
+    };
+    saveCustom();
+  }, [customWorkouts, isLoaded, userId]);
+
   const addWorkout = (entry: Omit<WorkoutEntry, 'id' | 'createdAt' | 'isCompleted'>) => {
     const newWorkout: WorkoutEntry = {
       ...entry,
@@ -186,7 +228,7 @@ export function WorkoutsProvider({ children }: { children: ReactNode }) {
   const updateWorkout = (
     dateKey: string,
     workoutId: string,
-    updates: Partial<Pick<WorkoutEntry, 'name' | 'type' | 'minutes' | 'sets' | 'reps' | 'weight' | 'notes'>>
+    updates: Partial<Pick<WorkoutEntry, 'name' | 'type' | 'minutes' | 'sets' | 'reps' | 'weight' | 'notes' | 'steps'>>
   ) => {
     setWorkoutsByDate(prev => {
       const existing = prev[dateKey];
@@ -234,7 +276,7 @@ export function WorkoutsProvider({ children }: { children: ReactNode }) {
       if (!wasCompleted) {
         addHistoryEventForToday({
           type: 'workoutLogged',
-          summary: target
+            summary: target
             ? `${target.name} — ${target.type === 'cardio' ? `${target.minutes ?? 0} min cardio` : `${target.sets ?? 0} sets`}`
             : `Completed workout (${updatedCompletedCount} total today)`,
           details: {
@@ -247,8 +289,25 @@ export function WorkoutsProvider({ children }: { children: ReactNode }) {
             weightPerSetLbs: target?.weight ? [target.weight] : undefined,
             isCardio: target?.type === 'cardio',
             durationMinutes: target?.minutes,
+            stepsAddedFromWorkout: target?.steps,
+            stepsTotalAfter: stepsToday + (target?.steps ?? 0),
           },
         });
+        const workoutSteps = target?.steps ?? 0;
+        if (workoutSteps > 0) {
+          addSteps(workoutSteps);
+          addHistoryEventForToday({
+            type: 'stepsLogged',
+            summary: `Logged ${workoutSteps} steps (total ${stepsToday + workoutSteps})`,
+            details: {
+              previous: stepsToday,
+              current: stepsToday + workoutSteps,
+              delta: workoutSteps,
+              stepGoal: undefined,
+              source: 'cardio',
+            },
+          });
+        }
       }
 
       return {
@@ -278,6 +337,27 @@ export function WorkoutsProvider({ children }: { children: ReactNode }) {
   const deleteWorkoutTemplate = (templateId: string) => {
     setWorkoutTemplates(prev => prev.filter(t => t.id !== templateId));
   };
+
+  const addCustomWorkout = (workout: Omit<CustomWorkout, 'id'>): CustomWorkout => {
+    const created: CustomWorkout = {
+      ...workout,
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+    };
+    setCustomWorkouts(prev => [...prev, created]);
+    return created;
+  };
+
+  const updateCustomWorkout = (id: string, updates: Partial<CustomWorkout>) => {
+    setCustomWorkouts(prev =>
+      prev.map(c => (c.id === id ? { ...c, ...updates } : c))
+    );
+  };
+
+  const deleteCustomWorkout = (id: string) => {
+    setCustomWorkouts(prev => prev.filter(c => c.id !== id));
+  };
+
+  const getCustomWorkouts = () => customWorkouts;
 
   const getWorkoutsForDate = (dateKey: string): WorkoutEntry[] => {
     return workoutsByDate[dateKey] || [];
@@ -312,6 +392,7 @@ export function WorkoutsProvider({ children }: { children: ReactNode }) {
       value={{
         workoutsByDate,
         workoutTemplates,
+        customWorkouts,
         addWorkout,
         updateWorkout,
         deleteWorkout,
@@ -319,6 +400,10 @@ export function WorkoutsProvider({ children }: { children: ReactNode }) {
         addWorkoutTemplate,
         updateWorkoutTemplate,
         deleteWorkoutTemplate,
+        addCustomWorkout,
+        updateCustomWorkout,
+        deleteCustomWorkout,
+        getCustomWorkouts,
         getWorkoutsForDate,
         hasCompletedWorkoutsForDate,
         hasWorkoutsForDate,

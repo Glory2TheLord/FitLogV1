@@ -194,6 +194,16 @@ function renderTimelineDetails(event: any) {
     return <Text style={styles.timelineDetails}>Reached {weightLbs} lb (goal {goalWeightLbs} lb)</Text>;
   }
 
+  if (event.type === 'workoutNotesUpdated' && event.details) {
+    const { newNotes } = event.details as any;
+    if (!newNotes) return null;
+    return <Text style={styles.timelineDetails}>{newNotes}</Text>;
+  }
+
+  if (event.type === 'workoutEdited' && event.details) {
+    return <Text style={styles.timelineDetails}>Updated workout template settings.</Text>;
+  }
+
   return null;
 }
 

@@ -19,7 +19,9 @@ export type DayHistoryEventType =
   | 'photosSlotCompleted'
   | 'photosAllCompleted'
   | 'waterLogged'
-  | 'cheatMealLogged';
+  | 'cheatMealLogged'
+  | 'workoutNotesUpdated'
+  | 'workoutEdited';
 
 export type DayHistoryEvent = {
   id: string;

@@ -5,7 +5,9 @@ import {
     WorkoutEntry,
     WorkoutTemplate,
     WorkoutType,
+    CustomWorkout,
 } from '@/contexts/WorkoutsContext';
+import { useDayMetrics } from '@/contexts/DayMetricsContext';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -47,14 +49,23 @@ type WorkoutSlot = {
     reps: number | null;
     weight: number | null;
     minutes: number | null;
+    steps: number | null;
     notes?: string;
   } | null;
   isCompleted: boolean;
 };
 
+const createEmptySlot = (id: string): WorkoutSlot => ({
+  id,
+  selectedWorkoutId: null,
+  selectedWorkoutData: null,
+  isCompleted: false,
+});
+
 export default function WorkoutsScreen() {
   const router = useRouter();
   const { programDays, getProgramDayByIndex } = useProgramDays();
+  const { addHistoryEventForToday } = useDayMetrics();
   const {
     getWorkoutsForDate,
     toggleWorkoutCompleted,
@@ -62,6 +73,10 @@ export default function WorkoutsScreen() {
     addWorkout,
     updateWorkout,
     workoutTemplates,
+    customWorkouts,
+    addCustomWorkout,
+    updateCustomWorkout,
+    deleteCustomWorkout,
     addWorkoutTemplate,
     updateWorkoutTemplate,
     deleteWorkoutTemplate,
@@ -82,12 +97,7 @@ export default function WorkoutsScreen() {
   const todayWorkouts = getWorkoutsForDate(todayDateKey);
 
   // Workout slots state - sync with actual workout entries
-  const [workoutSlots, setWorkoutSlots] = useState<WorkoutSlot[]>([
-    { id: '1', selectedWorkoutId: null, selectedWorkoutData: null, isCompleted: false },
-    { id: '2', selectedWorkoutId: null, selectedWorkoutData: null, isCompleted: false },
-    { id: '3', selectedWorkoutId: null, selectedWorkoutData: null, isCompleted: false },
-    { id: '4', selectedWorkoutId: null, selectedWorkoutData: null, isCompleted: false },
-  ]);
+  const [workoutSlots, setWorkoutSlots] = useState<WorkoutSlot[]>([createEmptySlot('1')]);
 
   // Load existing workouts into slots on mount and when todayWorkouts changes
   useEffect(() => {
@@ -102,24 +112,17 @@ export default function WorkoutsScreen() {
           reps: workout.reps ?? null,
           weight: workout.weight ?? null,
           minutes: workout.minutes ?? null,
+          steps: workout.steps ?? null,
           notes: workout.notes,
         },
         isCompleted: workout.isCompleted,
       }));
       
-      // Ensure we have at least 4 slots
-      while (loadedSlots.length < 4) {
-        loadedSlots.push({
-          id: (loadedSlots.length + 1).toString(),
-          selectedWorkoutId: null,
-          selectedWorkoutData: null,
-          isCompleted: false,
-        });
-      }
-      
       setWorkoutSlots(loadedSlots);
+    } else {
+      setWorkoutSlots([createEmptySlot('1')]);
     }
-  }, [todayWorkouts.length]);
+  }, [todayWorkouts.length, todayDateKey]);
 
   // Template selection
   const [expandedSlotId, setExpandedSlotId] = useState<string | null>(null);
@@ -135,32 +138,68 @@ export default function WorkoutsScreen() {
   const [workoutSets, setWorkoutSets] = useState('');
   const [workoutReps, setWorkoutReps] = useState('');
   const [workoutWeight, setWorkoutWeight] = useState('');
+  const [workoutSteps, setWorkoutSteps] = useState('');
   const [workoutNotes, setWorkoutNotes] = useState('');
   const [selectedProgramDayIds, setSelectedProgramDayIds] = useState<ProgramDayId[]>([]);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
 
   const templatesForToday = programDay ? getTemplatesForProgramDay(programDay.id) : [];
   const otherTemplates = workoutTemplates.filter(t => !programDay || !(t.programDayIds?.includes(programDay.id) ?? false));
+  const allCustomWorkouts = customWorkouts;
 
   const handleTemplateSelect = (slotId: string, templateId: string) => {
     if (templateId === 'add-new') {
       setCurrentEditingSlotId(slotId);
       setIsCustomWorkout(true);
+      setEditingTemplateId(null);
       setWorkoutName('');
       setWorkoutType('strength');
       setWorkoutMinutes('');
       setWorkoutSets('');
       setWorkoutReps('');
       setWorkoutWeight('');
+      setWorkoutSteps('');
       setWorkoutNotes('');
-      setSelectedProgramDayIds(programDay ? [programDay.id] : []);
+      setSelectedProgramDayIds([]);
       setShowAddModal(true);
       setExpandedSlotId(null);
     } else {
+      setIsCustomWorkout(false);
+      setEditingTemplateId(null);
       // Find template and create workout entry
-      const template = workoutTemplates.find(t => t.id === templateId);
+      const template =
+        workoutTemplates.find(t => t.id === templateId) ||
+        allCustomWorkouts.find(t => t.id === templateId);
       if (!template || !programDay) return;
 
-      // Create workout entry in context
+      // Update only the selected slot locally
+      setWorkoutSlots(prev =>
+        prev.map(slot =>
+          slot.id === slotId
+            ? {
+                ...slot,
+                selectedWorkoutId: slot.selectedWorkoutId ?? `temp-${Date.now()}`,
+                selectedWorkoutData: {
+                  name: template.name,
+                  type: template.type,
+                  sets: template.defaultSets ?? null,
+                  reps: template.defaultReps ?? null,
+                  weight: template.defaultWeight ?? null,
+                  minutes: template.defaultMinutes ?? null,
+                  steps: template.defaultSteps ?? null,
+                  notes: '',
+                },
+                isCompleted: false,
+              }
+            : slot
+        )
+      );
+
+      // Persist/update workout entry in context for this date
+      const currentSlot = workoutSlots.find(s => s.id === slotId);
+      const existingForSlot = currentSlot
+        ? todayWorkouts.find(w => w.id === currentSlot.selectedWorkoutId)
+        : undefined;
       const newWorkoutEntry: Omit<WorkoutEntry, 'id' | 'createdAt' | 'isCompleted'> = {
         dateKey: todayDateKey,
         programDayId: programDay.id,
@@ -172,13 +211,15 @@ export default function WorkoutsScreen() {
         sets: template.defaultSets,
         reps: template.defaultReps,
         weight: template.defaultWeight,
-        notes: '',
+        steps: template.defaultSteps,
+        notes: existingForSlot?.notes ?? '',
       };
-
-      addWorkout(newWorkoutEntry);
+      if (existingForSlot) {
+        updateWorkout(todayDateKey, existingForSlot.id, newWorkoutEntry);
+      } else {
+        addWorkout(newWorkoutEntry);
+      }
       setExpandedSlotId(null);
-      
-      // Note: workoutSlots will update via useEffect when todayWorkouts changes
     }
   };
 
@@ -200,17 +241,30 @@ export default function WorkoutsScreen() {
   const handleClearSlot = (slotId: string) => {
     const slot = workoutSlots.find(s => s.id === slotId);
     if (!slot || !slot.selectedWorkoutId) return;
-    
-    // Delete workout entry from context
-    deleteWorkout(todayDateKey, slot.selectedWorkoutId);
-    
-    // Update local state immediately
-    setWorkoutSlots(prev =>
-      prev.map(s =>
-        s.id === slotId
-          ? { ...s, selectedWorkoutId: null, selectedWorkoutData: null, isCompleted: false }
-          : s
-      )
+
+    Alert.alert(
+      'Remove workout?',
+      'This will remove this workout from today. You can add it again later from the list.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+            onPress: () => {
+              // Delete workout entry from context
+              deleteWorkout(todayDateKey, slot.selectedWorkoutId!);
+
+            // Update local state immediately
+            setWorkoutSlots(prev =>
+              prev.map(s =>
+                s.id === slotId
+                  ? { ...s, selectedWorkoutId: null, selectedWorkoutData: null, isCompleted: false }
+                  : s
+              )
+            );
+          },
+        },
+      ]
     );
   };
 
@@ -252,8 +306,9 @@ export default function WorkoutsScreen() {
     if (data.reps) parts.push(`${data.reps} reps`);
     if (data.weight) parts.push(`${data.weight} lbs`);
     if (data.minutes) parts.push(`${data.minutes} min`);
+    if (data.steps) parts.push(`${data.steps} steps`);
     
-    return parts.length > 0 ? parts.join(' • ') : workoutTypeLabels[data.type];
+    return parts.length > 0 ? parts.join(' · ') : workoutTypeLabels[data.type];
   };
 
   // Export completion status for Home screen
@@ -274,6 +329,41 @@ export default function WorkoutsScreen() {
     );
   };
 
+  const handleDeleteCustomWorkout = (workout: CustomWorkout) => {
+    Alert.alert(
+      'Delete workout?',
+      'This will remove this workout from your custom workouts list. It will no longer appear in the dropdown.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            deleteCustomWorkout(workout.id);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleEditTemplate = (template: WorkoutTemplate) => {
+    setEditingTemplateId(template.id);
+    setEditingWorkoutId(null);
+    setIsCustomWorkout(true);
+    setCurrentEditingSlotId(null);
+    setWorkoutName(template.name);
+    setWorkoutType(template.type);
+    setWorkoutMinutes(template.defaultMinutes?.toString() || '');
+    setWorkoutSets(template.defaultSets?.toString() || '');
+    setWorkoutReps(template.defaultReps?.toString() || '');
+    setWorkoutWeight(template.defaultWeight?.toString() || '');
+    setWorkoutSteps(template.defaultSteps?.toString() || '');
+    setWorkoutNotes('');
+    setSelectedProgramDayIds(template.programDayIds || []);
+    setShowAddModal(true);
+    setExpandedSlotId(null);
+  };
+
   const handleEditWorkout = (workout: WorkoutEntry) => {
     setEditingWorkoutId(workout.id);
     setIsCustomWorkout(false);
@@ -283,8 +373,10 @@ export default function WorkoutsScreen() {
     setWorkoutSets(workout.sets?.toString() || '');
     setWorkoutReps(workout.reps?.toString() || '');
     setWorkoutWeight(workout.weight?.toString() || '');
+    setWorkoutSteps(workout.steps?.toString() || '');
     setWorkoutNotes(workout.notes || '');
     setSelectedProgramDayIds([]);
+    setEditingTemplateId(null);
     setShowAddModal(true);
   };
 
@@ -298,6 +390,7 @@ export default function WorkoutsScreen() {
     const setsNumber = workoutSets ? parseInt(workoutSets) : undefined;
     const repsNumber = workoutReps ? parseInt(workoutReps) : undefined;
     const weightNumber = workoutWeight ? parseFloat(workoutWeight) : undefined;
+    const stepsNumber = workoutSteps ? parseInt(workoutSteps) : undefined;
 
     if (workoutType === 'cardio' && (minutesNumber == null || isNaN(minutesNumber) || minutesNumber <= 0)) {
       Alert.alert('Required', 'Please enter how many minutes you did for cardio.');
@@ -305,6 +398,8 @@ export default function WorkoutsScreen() {
     }
 
     if (editingWorkoutId) {
+      const prevEntry = todayWorkouts.find(w => w.id === editingWorkoutId);
+      const previousNotes = prevEntry?.notes ?? '';
       // Edit existing workout
       updateWorkout(todayDateKey, editingWorkoutId, {
         name: workoutName.trim(),
@@ -313,8 +408,72 @@ export default function WorkoutsScreen() {
         sets: setsNumber,
         reps: repsNumber,
         weight: weightNumber,
+        steps: stepsNumber,
         notes: workoutNotes.trim() || undefined,
       });
+      const newNotes = workoutNotes.trim() || '';
+      if (previousNotes !== newNotes) {
+        addHistoryEventForToday({
+          type: 'workoutNotesUpdated',
+          summary: `Updated notes for workout: ${prevEntry?.name ?? workoutName.trim()}`,
+          details: {
+            workoutId: editingWorkoutId,
+            workoutName: prevEntry?.name ?? workoutName.trim(),
+            previousNotes,
+            newNotes,
+          },
+        });
+      }
+    } else if (editingTemplateId) {
+      const isCustom = allCustomWorkouts.some(c => c.id === editingTemplateId);
+      const previous = isCustom
+        ? allCustomWorkouts.find(c => c.id === editingTemplateId)
+        : workoutTemplates.find(t => t.id === editingTemplateId);
+      if (isCustom) {
+        updateCustomWorkout(editingTemplateId, {
+          name: workoutName.trim(),
+          type: workoutType,
+          defaultMinutes: minutesNumber,
+          defaultSets: setsNumber,
+          defaultReps: repsNumber,
+          defaultWeight: weightNumber,
+          defaultSteps: stepsNumber,
+          programDayIds: selectedProgramDayIds,
+        });
+      } else {
+        updateWorkoutTemplate(editingTemplateId, {
+          name: workoutName.trim(),
+          type: workoutType,
+          defaultMinutes: minutesNumber,
+          defaultSets: setsNumber,
+          defaultReps: repsNumber,
+          defaultWeight: weightNumber,
+          defaultSteps: stepsNumber,
+          programDayIds: selectedProgramDayIds,
+        });
+      }
+      const updatedWorkout = {
+        ...previous,
+        name: workoutName.trim(),
+        type: workoutType,
+        defaultMinutes: minutesNumber,
+        defaultSets: setsNumber,
+        defaultReps: repsNumber,
+        defaultWeight: weightNumber,
+        defaultSteps: stepsNumber,
+        programDayIds: selectedProgramDayIds,
+      };
+      if (isCustom && previous) {
+        addHistoryEventForToday({
+          type: 'workoutEdited',
+          summary: `Edited workout: ${updatedWorkout.name}`,
+          details: {
+            workoutId: editingTemplateId,
+            previous,
+            updated: updatedWorkout,
+          },
+        });
+      }
     } else {
       // Add new workout
       if (!programDay) {
@@ -322,17 +481,22 @@ export default function WorkoutsScreen() {
         return;
       }
 
-      // If custom workout and user wants to save as template
-      if (isCustomWorkout && selectedProgramDayIds.length > 0) {
-        addWorkoutTemplate({
+      let chosenTemplateId: string | null = null;
+      let chosenTemplate: WorkoutTemplate | CustomWorkout | null = null;
+
+      if (isCustomWorkout) {
+        const created = addCustomWorkout({
           name: workoutName.trim(),
           type: workoutType,
           defaultMinutes: minutesNumber,
           defaultSets: setsNumber,
           defaultReps: repsNumber,
           defaultWeight: weightNumber,
+          defaultSteps: stepsNumber,
           programDayIds: selectedProgramDayIds,
         });
+        chosenTemplateId = created.id;
+        chosenTemplate = created;
       }
 
       // Add workout to today
@@ -347,10 +511,34 @@ export default function WorkoutsScreen() {
         sets: setsNumber ?? undefined,
         reps: repsNumber ?? undefined,
         weight: weightNumber ?? undefined,
+        steps: stepsNumber ?? undefined,
         notes: workoutNotes.trim() || undefined,
       };
 
       addWorkout(newWorkout);
+
+      if (chosenTemplateId && chosenTemplate) {
+        setWorkoutSlots(prev =>
+          prev.map(slot =>
+            slot.id === (currentEditingSlotId ?? slot.id)
+              ? {
+                  ...slot,
+                  selectedWorkoutId: chosenTemplateId,
+                  selectedWorkoutData: {
+                    name: chosenTemplate.name,
+                    type: chosenTemplate.type,
+                    sets: chosenTemplate.defaultSets ?? null,
+                    reps: chosenTemplate.defaultReps ?? null,
+                    weight: chosenTemplate.defaultWeight ?? null,
+                    minutes: chosenTemplate.defaultMinutes ?? null,
+                    steps: chosenTemplate.defaultSteps ?? null,
+                  },
+                  isCompleted: false,
+                }
+              : slot
+          )
+        );
+      }
     }
 
     // Reset and close
@@ -362,8 +550,11 @@ export default function WorkoutsScreen() {
     setWorkoutSets('');
     setWorkoutReps('');
     setWorkoutWeight('');
+    setWorkoutSteps('');
     setWorkoutNotes('');
     setSelectedProgramDayIds([]);
+    setEditingTemplateId(null);
+    setIsCustomWorkout(false);
     setShowAddModal(false);
   };
 
@@ -499,6 +690,12 @@ export default function WorkoutsScreen() {
                                 </Text>
                               </TouchableOpacity>
                               <TouchableOpacity
+                                style={styles.dropdownOptionEdit}
+                                onPress={() => handleEditTemplate(template)}
+                              >
+                                <Feather name="edit-2" size={16} color="#666" />
+                              </TouchableOpacity>
+                              <TouchableOpacity
                                 style={styles.dropdownOptionDelete}
                                 onPress={() => handleDeleteTemplate(template)}
                               >
@@ -523,8 +720,44 @@ export default function WorkoutsScreen() {
                                 </Text>
                               </TouchableOpacity>
                               <TouchableOpacity
+                                style={styles.dropdownOptionEdit}
+                                onPress={() => handleEditTemplate(template)}
+                              >
+                                <Feather name="edit-2" size={16} color="#666" />
+                              </TouchableOpacity>
+                              <TouchableOpacity
                                 style={styles.dropdownOptionDelete}
                                 onPress={() => handleDeleteTemplate(template)}
+                              >
+                                <Feather name="trash-2" size={16} color="#ef4444" />
+                              </TouchableOpacity>
+                            </View>
+                          ))}
+                        </>
+                      )}
+
+                      {allCustomWorkouts.length > 0 && (
+                        <>
+                          <Text style={styles.dropdownSection}>Custom workouts:</Text>
+                          {allCustomWorkouts.map((template) => (
+                            <View key={template.id} style={styles.dropdownOptionRow}>
+                              <TouchableOpacity
+                                style={styles.dropdownOptionMain}
+                                onPress={() => handleTemplateSelect(slot.id, template.id)}
+                              >
+                                <Text style={styles.dropdownOptionText}>
+                                  {workoutTypeLabels[template.type]} · {template.name}
+                                </Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={styles.dropdownOptionEdit}
+                                onPress={() => handleEditTemplate(template)}
+                              >
+                                <Feather name="edit-2" size={16} color="#666" />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={styles.dropdownOptionDelete}
+                                onPress={() => handleDeleteCustomWorkout(template)}
                               >
                                 <Feather name="trash-2" size={16} color="#ef4444" />
                               </TouchableOpacity>
@@ -565,7 +798,13 @@ export default function WorkoutsScreen() {
           <View style={styles.modalContent}>
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={styles.modalTitle}>
-                {editingWorkoutId ? 'Edit Workout' : isCustomWorkout ? 'New Workout' : 'Add Workout'}
+                {editingWorkoutId
+                  ? 'Edit Workout'
+                  : editingTemplateId
+                  ? 'Edit Workout Template'
+                  : isCustomWorkout
+                  ? 'New Workout'
+                  : 'Add Workout'}
               </Text>
 
               <Text style={styles.modalLabel}>Workout name *</Text>
@@ -641,6 +880,20 @@ export default function WorkoutsScreen() {
                     onChangeText={setWorkoutMinutes}
                   />
                 </View>
+              </View>
+              <View style={styles.modalRow}>
+                <View style={styles.modalHalf}>
+                  <Text style={styles.modalLabel}>Steps (optional)</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="e.g. 1500"
+                    placeholderTextColor="#999"
+                    keyboardType="number-pad"
+                    value={workoutSteps}
+                    onChangeText={setWorkoutSteps}
+                  />
+                </View>
+                <View style={styles.modalHalf} />
               </View>
               {workoutType === 'cardio' && (
                 <Text style={styles.modalHelperText}>* Time is required for cardio</Text>
@@ -862,6 +1115,12 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     paddingHorizontal: 12,
+  },
+  dropdownOptionEdit: {
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   dropdownOptionDelete: {
     paddingHorizontal: 12,
