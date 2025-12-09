@@ -7,6 +7,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ACCENT = '#f97316';
 
+const formatMacro = (value?: number | null): string | null => {
+  if (value == null) return null;
+  return Number.isInteger(value) ? `${value}` : `${Number(value.toFixed(1))}`;
+};
+
 export default function HistoryDayDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ dayId?: string }>();
@@ -153,13 +158,17 @@ function renderTimelineRow(event: any) {
     const mealName = details?.mealName ?? event.summary ?? 'Meal';
     const calories = details?.calories;
     const protein = details?.proteinGrams;
+    const fat = details?.fatGrams;
+    const carbs = details?.carbsGrams;
     const completed = details?.mealsCompleted;
     const planned = details?.mealsPlanned;
 
     let mainText = mealName;
     const parts: string[] = [];
-    if (calories != null) parts.push(`${calories} kcal`);
-    if (protein != null) parts.push(`${protein} g protein`);
+    if (calories != null) parts.push(`${formatMacro(calories) ?? calories} kcal`);
+    if (protein != null) parts.push(`${formatMacro(protein) ?? protein} g protein`);
+    if (fat != null) parts.push(`${formatMacro(fat)} g fat`);
+    if (carbs != null) parts.push(`${formatMacro(carbs)} g carbs`);
     if (parts.length > 0) {
       mainText = `${mealName} — ${parts.join(', ')}`;
     }

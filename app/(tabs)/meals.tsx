@@ -46,6 +46,18 @@ export default function MealsScreen() {
   const [newMealCategory, setNewMealCategory] = useState<MealCategory>('meal');
   const [expandedSlotId, setExpandedSlotId] = useState<string | null>(null);
 
+  const parseDecimalOrNull = (value: string): number | null => {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const parsed = parseFloat(trimmed);
+    return Number.isNaN(parsed) ? null : parsed;
+  };
+
+  const formatMacro = (value?: number | null): string | null => {
+    if (value == null) return null;
+    return Number.isInteger(value) ? `${value}` : `${Number(value.toFixed(1))}`;
+  };
+
   // Recalculate daily totals whenever slots or templates change
   useEffect(() => {
     recalculateDailyTotals();
@@ -80,9 +92,14 @@ export default function MealsScreen() {
 
       if (!wasCompleted) {
         const template = getTemplateById(target?.templateId ?? null);
+        const macroParts: string[] = [];
+        if (template?.calories != null) macroParts.push(`${formatMacro(template.calories) ?? template.calories} kcal`);
+        if (template?.protein != null) macroParts.push(`${formatMacro(template.protein) ?? template.protein} g protein`);
+        if (template?.fatGrams != null) macroParts.push(`${formatMacro(template.fatGrams)} g fat`);
+        if (template?.carbsGrams != null) macroParts.push(`${formatMacro(template.carbsGrams)} g carbs`);
         addHistoryEventForToday({
           type: 'mealCompleted',
-          summary: `${template?.name ?? 'Meal'} completed${template?.calories ? ` — ${template.calories} kcal` : ''}${template?.protein ? `, ${template.protein} g protein` : ''}`,
+          summary: `${template?.name ?? 'Meal'} completed${macroParts.length > 0 ? ` - ${macroParts.join(', ')}` : ''}`,
           details: {
             mealsCompleted,
             mealsPlanned,
@@ -90,6 +107,8 @@ export default function MealsScreen() {
             mealName: template?.name,
             calories: template?.calories,
             proteinGrams: template?.protein,
+            fatGrams: template?.fatGrams,
+            carbsGrams: template?.carbsGrams,
           },
         });
       }
@@ -169,15 +188,20 @@ export default function MealsScreen() {
 
   const handleSaveNewMeal = () => {
     if (!newMealName.trim() || !newMealCalories || !newMealProtein) return;
-    const parsedFat = newMealFat.trim() === '' ? undefined : parseInt(newMealFat, 10);
-    const parsedCarbs = newMealCarbs.trim() === '' ? undefined : parseInt(newMealCarbs, 10);
+    const parsedCalories = parseDecimalOrNull(newMealCalories);
+    const parsedProtein = parseDecimalOrNull(newMealProtein);
+    const parsedFat = parseDecimalOrNull(newMealFat) ?? undefined;
+    const parsedCarbs = parseDecimalOrNull(newMealCarbs) ?? undefined;
+
+    if (parsedCalories == null || Number.isNaN(parsedCalories)) return;
+    if (parsedProtein == null || Number.isNaN(parsedProtein)) return;
 
     if (editingCustomMeal) {
       const updatedTemplate: MealTemplate = {
         ...editingCustomMeal,
         name: newMealName.trim(),
-        calories: parseInt(newMealCalories, 10),
-        protein: parseInt(newMealProtein, 10),
+        calories: parsedCalories,
+        protein: parsedProtein,
         fatGrams: parsedFat,
         carbsGrams: parsedCarbs,
         category: newMealCategory,
@@ -196,8 +220,8 @@ export default function MealsScreen() {
       const newTemplate: MealTemplate = {
         id: Date.now().toString(),
         name: newMealName.trim(),
-        calories: parseInt(newMealCalories, 10),
-        protein: parseInt(newMealProtein, 10),
+        calories: parsedCalories,
+        protein: parsedProtein,
         fatGrams: parsedFat,
         carbsGrams: parsedCarbs,
         category: newMealCategory,
@@ -417,19 +441,19 @@ export default function MealsScreen() {
                   <View>
                     <View style={styles.infoRow}>
                       <Text style={styles.infoText}>
-                        <Text style={styles.infoNumber}>{template.calories}</Text> cal
+                        <Text style={styles.infoNumber}>{formatMacro(template.calories) ?? template.calories}</Text> cal
                         {' | '}
-                        <Text style={styles.infoNumber}>{template.protein}</Text> g protein
+                        <Text style={styles.infoNumber}>{formatMacro(template.protein) ?? template.protein}</Text> g protein
                         {template.fatGrams != null && (
                           <>
                             {' | '}
-                            <Text style={styles.infoNumber}>{template.fatGrams}</Text> g fat
+                            <Text style={styles.infoNumber}>{formatMacro(template.fatGrams)}</Text> g fat
                           </>
                         )}
                         {template.carbsGrams != null && (
                           <>
                             {' | '}
-                            <Text style={styles.infoNumber}>{template.carbsGrams}</Text> g carbs
+                            <Text style={styles.infoNumber}>{formatMacro(template.carbsGrams)}</Text> g carbs
                           </>
                         )}
                       </Text>
