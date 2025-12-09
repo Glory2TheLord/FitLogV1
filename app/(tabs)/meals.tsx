@@ -37,20 +37,21 @@ export default function MealsScreen() {
   const [editingCustomMeal, setEditingCustomMeal] = useState<MealTemplate | null>(null);
 
   const [showAddMealModal, setShowAddMealModal] = useState(false);
-  const [currentEditingSlotId, setCurrentEditingSlotId] = useState<number | null>(null);
+  const [currentEditingSlotId, setCurrentEditingSlotId] = useState<string | null>(null);
   const [newMealName, setNewMealName] = useState('');
   const [newMealCalories, setNewMealCalories] = useState('');
   const [newMealProtein, setNewMealProtein] = useState('');
   const [newMealFat, setNewMealFat] = useState('');
+  const [newMealCarbs, setNewMealCarbs] = useState('');
   const [newMealCategory, setNewMealCategory] = useState<MealCategory>('meal');
-  const [expandedSlotId, setExpandedSlotId] = useState<number | null>(null);
+  const [expandedSlotId, setExpandedSlotId] = useState<string | null>(null);
 
   // Recalculate daily totals whenever slots or templates change
   useEffect(() => {
     recalculateDailyTotals();
   }, [mealSlots, mealTemplates]);
 
-  const handleTemplateSelect = (slotId: number, templateId: string) => {
+  const handleTemplateSelect = (slotId: string, templateId: string) => {
     if (templateId === 'add-new') {
       setCurrentEditingSlotId(slotId);
       setEditingCustomMeal(null);
@@ -66,7 +67,7 @@ export default function MealsScreen() {
     }
   };
 
-  const handleToggleCompleted = (slotId: number) => {
+  const handleToggleCompleted = (slotId: string) => {
     setMealSlots((prev) => {
       const target = prev.find((slot) => slot.id === slotId);
       const wasCompleted = target?.completed ?? false;
@@ -126,7 +127,7 @@ export default function MealsScreen() {
     });
   };
 
-  const handleClearSlot = (slotId: number) => {
+  const handleClearSlot = (slotId: string) => {
     setMealSlots((prev) =>
       prev.map((slot) =>
         slot.id === slotId
@@ -136,9 +137,40 @@ export default function MealsScreen() {
     );
   };
 
+  const handleAddSlot = () => {
+    const newId = Date.now().toString();
+    setMealSlots(prev => [
+      ...prev,
+      { id: newId, templateId: null, completed: false },
+    ]);
+  };
+
+  const handleDeleteSlot = (slotId: string) => {
+    if (mealSlots.length === 1) {
+      Alert.alert('Cannot delete', 'You must have at least one meal slot.');
+      return;
+    }
+
+    Alert.alert(
+      'Remove this meal slot?',
+      'This will delete any selection in this slot.',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes',
+          style: 'destructive',
+          onPress: () => {
+            setMealSlots(prev => prev.filter(slot => slot.id !== slotId));
+          },
+        },
+      ]
+    );
+  };
+
   const handleSaveNewMeal = () => {
     if (!newMealName.trim() || !newMealCalories || !newMealProtein) return;
     const parsedFat = newMealFat.trim() === '' ? undefined : parseInt(newMealFat, 10);
+    const parsedCarbs = newMealCarbs.trim() === '' ? undefined : parseInt(newMealCarbs, 10);
 
     if (editingCustomMeal) {
       const updatedTemplate: MealTemplate = {
@@ -147,6 +179,7 @@ export default function MealsScreen() {
         calories: parseInt(newMealCalories, 10),
         protein: parseInt(newMealProtein, 10),
         fatGrams: parsedFat,
+        carbsGrams: parsedCarbs,
         category: newMealCategory,
       };
 
@@ -166,6 +199,7 @@ export default function MealsScreen() {
         calories: parseInt(newMealCalories, 10),
         protein: parseInt(newMealProtein, 10),
         fatGrams: parsedFat,
+        carbsGrams: parsedCarbs,
         category: newMealCategory,
       };
 
@@ -187,6 +221,7 @@ export default function MealsScreen() {
     setNewMealCalories('');
     setNewMealProtein('');
     setNewMealFat('');
+    setNewMealCarbs('');
     setNewMealCategory('meal');
     setCurrentEditingSlotId(null);
     setEditingCustomMeal(null);
@@ -198,6 +233,7 @@ export default function MealsScreen() {
     setNewMealCalories('');
     setNewMealProtein('');
     setNewMealFat('');
+    setNewMealCarbs('');
     setNewMealCategory('meal');
     setCurrentEditingSlotId(null);
     setEditingCustomMeal(null);
@@ -244,6 +280,7 @@ export default function MealsScreen() {
     setNewMealCalories(String(template.calories));
     setNewMealProtein(String(template.protein));
     setNewMealFat(template.fatGrams != null ? String(template.fatGrams) : '');
+    setNewMealCarbs(template.carbsGrams != null ? String(template.carbsGrams) : '');
     setNewMealCategory(template.category);
     setShowAddMealModal(true);
   };
@@ -266,7 +303,7 @@ export default function MealsScreen() {
         <View style={styles.mealsCard}>
           <Text style={styles.mealsTitle}>Meals</Text>
 
-          {mealSlots.map((slot) => {
+          {mealSlots.map((slot, index) => {
             const template = getTemplateById(slot.templateId);
             const isExpanded = expandedSlotId === slot.id;
 
@@ -280,6 +317,7 @@ export default function MealsScreen() {
               >
                 {/* Top row: dropdown + actions */}
                 <View style={styles.slotTopRow}>
+                  <Text style={styles.slotLabel}>Meal {index + 1}</Text>
                   <TouchableOpacity
                     style={styles.dropdownButton}
                     onPress={() =>
@@ -325,6 +363,13 @@ export default function MealsScreen() {
                       onPress={() => handleClearSlot(slot.id)}
                     >
                       <Feather name="x" size={18} color="#ef4444" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => handleDeleteSlot(slot.id)}
+                    >
+                      <Feather name="trash-2" size={16} color="#666" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -381,6 +426,12 @@ export default function MealsScreen() {
                             <Text style={styles.infoNumber}>{template.fatGrams}</Text> g fat
                           </>
                         )}
+                        {template.carbsGrams != null && (
+                          <>
+                            {' | '}
+                            <Text style={styles.infoNumber}>{template.carbsGrams}</Text> g carbs
+                          </>
+                        )}
                       </Text>
                       {slot.completed && (
                         <Text style={styles.completedLabel}>Completed</Text>
@@ -398,6 +449,11 @@ export default function MealsScreen() {
               </View>
             );
           })}
+
+          <TouchableOpacity style={styles.addSlotButton} onPress={handleAddSlot}>
+            <Feather name="plus-circle" size={18} color={ACCENT} />
+            <Text style={styles.addSlotButtonText}>Add meal slot</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
 
@@ -446,6 +502,16 @@ export default function MealsScreen() {
               style={styles.input}
               value={newMealFat}
               onChangeText={setNewMealFat}
+              placeholder="Optional"
+              keyboardType="numeric"
+              placeholderTextColor="#999999"
+            />
+
+            <Text style={styles.inputLabel}>Carbs (g)</Text>
+            <TextInput
+              style={styles.input}
+              value={newMealCarbs}
+              onChangeText={setNewMealCarbs}
               placeholder="Optional"
               keyboardType="numeric"
               placeholderTextColor="#999999"
@@ -607,6 +673,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
+  slotLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginRight: 8,
+  },
   dropdownButton: {
     flex: 1,
     flexDirection: 'row',
@@ -721,6 +793,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999999',
     fontStyle: 'italic',
+  },
+  addSlotButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#F9F9F9',
+    borderWidth: 2,
+    borderColor: ACCENT,
+    borderStyle: 'dashed',
+    marginTop: 12,
+  },
+  addSlotButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: ACCENT,
   },
   categoryLabel: {
     fontSize: 10,

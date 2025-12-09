@@ -19,11 +19,12 @@ export type MealTemplate = {
   calories: number;
   protein: number;
   fatGrams?: number;
+  carbsGrams?: number;
   category: MealCategory;
 };
 
 export type MealSlot = {
-  id: number;
+  id: string;
   templateId: string | null;
   completed: boolean;
 };
@@ -69,11 +70,11 @@ const DEFAULT_MEAL_TEMPLATES: MealTemplate[] = [
 ];
 
 const DEFAULT_MEAL_SLOTS: MealSlot[] = [
-  { id: 1, templateId: null, completed: false },
-  { id: 2, templateId: null, completed: false },
-  { id: 3, templateId: null, completed: false },
-  { id: 4, templateId: null, completed: false },
-  { id: 5, templateId: null, completed: false },
+  { id: '1', templateId: null, completed: false },
+  { id: '2', templateId: null, completed: false },
+  { id: '3', templateId: null, completed: false },
+  { id: '4', templateId: null, completed: false },
+  { id: '5', templateId: null, completed: false },
 ];
 
 const DEFAULT_DAILY_TOTALS: DailyTotals = {
@@ -122,7 +123,14 @@ export function MealTrackingProvider({ children }: { children: ReactNode }) {
         if (isCancelled) return;
 
         setMealTemplates(templatesStored ? JSON.parse(templatesStored) : DEFAULT_MEAL_TEMPLATES);
-        setMealSlots(slotsStored ? JSON.parse(slotsStored) : DEFAULT_MEAL_SLOTS);
+        const parsedSlots: MealSlot[] = slotsStored ? JSON.parse(slotsStored) : DEFAULT_MEAL_SLOTS;
+        const normalizedSlots = parsedSlots.map((slot, idx) => ({
+          ...slot,
+          id: String(slot.id ?? idx + 1),
+          templateId: slot.templateId ?? null,
+          completed: !!slot.completed,
+        }));
+        setMealSlots(normalizedSlots.length > 0 ? normalizedSlots : DEFAULT_MEAL_SLOTS);
         setDailyTotals(totalsStored ? JSON.parse(totalsStored) : DEFAULT_DAILY_TOTALS);
         setCheatUsedToday(cheatStored ? JSON.parse(cheatStored) : false);
         setGoodEatingStreak(streakStored ? JSON.parse(streakStored) : 0);
