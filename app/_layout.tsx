@@ -1,6 +1,6 @@
 
 // app/_layout.tsx
-import { Slot } from 'expo-router';
+import { Slot, usePathname, useRouter } from 'expo-router';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import React from 'react';
 import { Platform, StatusBar, View } from 'react-native';
@@ -15,13 +15,30 @@ import { UserProfileProvider } from '@/contexts/UserProfileContext';
 import { WorkoutsProvider } from '@/contexts/WorkoutsContext';
 
 // Login/profile selection screen
-import ProfileSelectScreen from './profileSelect';
-
 function AppShell() {
   const { currentUser, isLoaded } = useUser();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const statusBarHeight =
     Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0;
+
+  React.useEffect(() => {
+    if (!isLoaded) return;
+
+    // If no user is selected, force the profile selection route.
+    if (!currentUser) {
+      if (pathname !== '/profileSelect') {
+        router.replace('/profileSelect');
+      }
+      return;
+    }
+
+    // If a user exists but we are on the profile selection route, send to the app.
+    if (currentUser && pathname === '/profileSelect') {
+      router.replace('/(tabs)');
+    }
+  }, [currentUser, isLoaded, pathname, router]);
 
   return (
     <View
@@ -55,13 +72,7 @@ function AppShell() {
       />
 
       {/* If we are still initializing, avoid flashing layouts */}
-      {!isLoaded ? null : !currentUser ? (
-        // No profile yet -> show login/profile selection
-        <ProfileSelectScreen />
-      ) : (
-        // Profile selected -> show the normal routed app (tabs etc.)
-        <Slot />
-      )}
+      {!isLoaded ? null : <Slot />}
     </View>
   );
 }

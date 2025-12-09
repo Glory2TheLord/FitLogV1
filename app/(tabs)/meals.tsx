@@ -34,12 +34,14 @@ export default function MealsScreen() {
     recalculateDailyTotals 
   } = useMealTracking();
   const { addHistoryEventForToday } = useDayMetrics();
+  const [editingCustomMeal, setEditingCustomMeal] = useState<MealTemplate | null>(null);
 
   const [showAddMealModal, setShowAddMealModal] = useState(false);
   const [currentEditingSlotId, setCurrentEditingSlotId] = useState<number | null>(null);
   const [newMealName, setNewMealName] = useState('');
   const [newMealCalories, setNewMealCalories] = useState('');
   const [newMealProtein, setNewMealProtein] = useState('');
+  const [newMealFat, setNewMealFat] = useState('');
   const [newMealCategory, setNewMealCategory] = useState<MealCategory>('meal');
   const [expandedSlotId, setExpandedSlotId] = useState<number | null>(null);
 
@@ -51,6 +53,7 @@ export default function MealsScreen() {
   const handleTemplateSelect = (slotId: number, templateId: string) => {
     if (templateId === 'add-new') {
       setCurrentEditingSlotId(slotId);
+      setEditingCustomMeal(null);
       setShowAddMealModal(true);
       setExpandedSlotId(null);
     } else {
@@ -135,33 +138,58 @@ export default function MealsScreen() {
 
   const handleSaveNewMeal = () => {
     if (!newMealName.trim() || !newMealCalories || !newMealProtein) return;
+    const parsedFat = newMealFat.trim() === '' ? undefined : parseInt(newMealFat, 10);
 
-    const newTemplate: MealTemplate = {
-      id: Date.now().toString(),
-      name: newMealName.trim(),
-      calories: parseInt(newMealCalories, 10),
-      protein: parseInt(newMealProtein, 10),
-      category: newMealCategory,
-    };
+    if (editingCustomMeal) {
+      const updatedTemplate: MealTemplate = {
+        ...editingCustomMeal,
+        name: newMealName.trim(),
+        calories: parseInt(newMealCalories, 10),
+        protein: parseInt(newMealProtein, 10),
+        fatGrams: parsedFat,
+        category: newMealCategory,
+      };
 
-    setMealTemplates((prev) => [...prev, newTemplate]);
+      setMealTemplates((prev) =>
+        prev.map((t) => (t.id === editingCustomMeal.id ? updatedTemplate : t))
+      );
 
-    if (currentEditingSlotId !== null) {
       setMealSlots((prev) =>
         prev.map((slot) =>
-          slot.id === currentEditingSlotId
-            ? { ...slot, templateId: newTemplate.id }
-            : slot
+          slot.templateId === editingCustomMeal.id ? { ...slot, templateId: updatedTemplate.id } : slot
         )
       );
+    } else {
+      const newTemplate: MealTemplate = {
+        id: Date.now().toString(),
+        name: newMealName.trim(),
+        calories: parseInt(newMealCalories, 10),
+        protein: parseInt(newMealProtein, 10),
+        fatGrams: parsedFat,
+        category: newMealCategory,
+      };
+
+      setMealTemplates((prev) => [...prev, newTemplate]);
+
+      if (currentEditingSlotId !== null) {
+        setMealSlots((prev) =>
+          prev.map((slot) =>
+            slot.id === currentEditingSlotId
+              ? { ...slot, templateId: newTemplate.id }
+              : slot
+          )
+        );
+      }
     }
 
     setShowAddMealModal(false);
     setNewMealName('');
     setNewMealCalories('');
     setNewMealProtein('');
+    setNewMealFat('');
     setNewMealCategory('meal');
     setCurrentEditingSlotId(null);
+    setEditingCustomMeal(null);
   };
 
   const handleCancelAddMeal = () => {
@@ -169,8 +197,10 @@ export default function MealsScreen() {
     setNewMealName('');
     setNewMealCalories('');
     setNewMealProtein('');
+    setNewMealFat('');
     setNewMealCategory('meal');
     setCurrentEditingSlotId(null);
+    setEditingCustomMeal(null);
   };
 
   const deleteMealTemplate = (templateId: string) => {
@@ -200,10 +230,22 @@ export default function MealsScreen() {
                   : slot
               )
             );
+            setEditingCustomMeal(null);
           },
         },
       ]
     );
+  };
+
+  const handleEditCustomMeal = (template: MealTemplate) => {
+    setEditingCustomMeal(template);
+    setCurrentEditingSlotId(null);
+    setNewMealName(template.name);
+    setNewMealCalories(String(template.calories));
+    setNewMealProtein(String(template.protein));
+    setNewMealFat(template.fatGrams != null ? String(template.fatGrams) : '');
+    setNewMealCategory(template.category);
+    setShowAddMealModal(true);
   };
 
   const getTemplateById = (id: string | null) => {
@@ -301,6 +343,12 @@ export default function MealsScreen() {
                           </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
+                          style={styles.dropdownOptionEdit}
+                          onPress={() => handleEditCustomMeal(temp)}
+                        >
+                          <Feather name="edit-2" size={16} color="#666" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
                           style={styles.dropdownOptionDelete}
                           onPress={() => deleteMealTemplate(temp.id)}
                         >
@@ -324,10 +372,15 @@ export default function MealsScreen() {
                   <View>
                     <View style={styles.infoRow}>
                       <Text style={styles.infoText}>
-                        <Text style={styles.infoNumber}>{template.calories}</Text>{' '}
-                        cal •{' '}
-                        <Text style={styles.infoNumber}>{template.protein}</Text>{' '}
-                        g protein
+                        <Text style={styles.infoNumber}>{template.calories}</Text> cal
+                        {' | '}
+                        <Text style={styles.infoNumber}>{template.protein}</Text> g protein
+                        {template.fatGrams != null && (
+                          <>
+                            {' | '}
+                            <Text style={styles.infoNumber}>{template.fatGrams}</Text> g fat
+                          </>
+                        )}
                       </Text>
                       {slot.completed && (
                         <Text style={styles.completedLabel}>Completed</Text>
@@ -388,6 +441,16 @@ export default function MealsScreen() {
               placeholderTextColor="#999999"
             />
 
+            <Text style={styles.inputLabel}>Fat (g)</Text>
+            <TextInput
+              style={styles.input}
+              value={newMealFat}
+              onChangeText={setNewMealFat}
+              placeholder="Optional"
+              keyboardType="numeric"
+              placeholderTextColor="#999999"
+            />
+
             <Text style={styles.inputLabel}>Category</Text>
             <View style={styles.categorySelector}>
               <TouchableOpacity
@@ -414,14 +477,24 @@ export default function MealsScreen() {
                 ]}
                 onPress={() => setNewMealCategory('snack')}
               >
-                <Text
-                  style={[
-                    styles.categoryButtonText,
-                    newMealCategory === 'snack' && styles.categoryButtonTextActive,
-                  ]}
-                >
-                  {categoryConfig.snack.icon} {categoryConfig.snack.label}
-                </Text>
+                <View style={styles.categoryButtonTextWrap}>
+                  <Text
+                    style={[
+                      styles.categoryButtonText,
+                      newMealCategory === 'snack' && styles.categoryButtonTextActive,
+                    ]}
+                  >
+                    {categoryConfig.snack.icon}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.categoryButtonText,
+                      newMealCategory === 'snack' && styles.categoryButtonTextActive,
+                    ]}
+                  >
+                    {categoryConfig.snack.label}
+                  </Text>
+                </View>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -575,6 +648,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
   },
+  dropdownOptionEdit: {
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   dropdownOptionDelete: {
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -716,6 +795,11 @@ const styles = StyleSheet.create({
   categoryButtonActive: {
     borderColor: ACCENT,
     backgroundColor: '#fff7ed',
+  },
+  categoryButtonTextWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
   },
   categoryButtonText: {
     fontSize: 12,

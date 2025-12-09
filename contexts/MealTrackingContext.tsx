@@ -18,6 +18,7 @@ export type MealTemplate = {
   name: string;
   calories: number;
   protein: number;
+  fatGrams?: number;
   category: MealCategory;
 };
 
