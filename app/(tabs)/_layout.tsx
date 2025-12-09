@@ -88,6 +88,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="explore"
+        options={{
+          tabBarButton: () => null,
+        }}
+      />
+      <Tabs.Screen
         name="history/[dayId]"
         options={{
           href: null,
