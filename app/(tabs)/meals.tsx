@@ -325,8 +325,6 @@ export default function MealsScreen() {
         
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.mealsCard}>
-          <Text style={styles.mealsTitle}>Meals</Text>
-
           {mealSlots.map((slot, index) => {
             const template = getTemplateById(slot.templateId);
             const isExpanded = expandedSlotId === slot.id;
@@ -341,7 +339,6 @@ export default function MealsScreen() {
               >
                 {/* Top row: dropdown + actions */}
                 <View style={styles.slotTopRow}>
-                  <Text style={styles.slotLabel}>Meal {index + 1}</Text>
                   <TouchableOpacity
                     style={styles.dropdownButton}
                     onPress={() =>
