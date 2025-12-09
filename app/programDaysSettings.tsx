@@ -41,13 +41,43 @@ export default function ProgramDaysSettingsScreen() {
     });
   }, [programDays]);
 
+  const saveDayName = (dayId: string, options?: { silent?: boolean }) => {
+    const day = programDays.find(d => d.id === dayId);
+    if (!day) return false;
+
+    const newName = (editedNames[dayId] ?? '').trim();
+    if (!newName) {
+      if (!options?.silent) {
+        Alert.alert('Name required', `Please enter a name for Day ${day.index}.`);
+      }
+      return false;
+    }
+
+    if (newName === day.name) {
+      return false;
+    }
+
+    updateProgramDay(dayId, { name: newName });
+    return true;
+  };
+
+  const handleSaveDay = (dayId: string) => {
+    const updated = saveDayName(dayId);
+    if (updated) {
+      Alert.alert('Saved', 'Training day updated.');
+    }
+  };
+
   const handleSave = () => {
+    const dayWithMissingName = programDays.find(day => !(editedNames[day.id]?.trim()));
+    if (dayWithMissingName) {
+      Alert.alert('Name required', `Please enter a name for Day ${dayWithMissingName.index}.`);
+      return;
+    }
+
     // Update each day with its new name
     programDays.forEach(day => {
-      const newName = editedNames[day.id]?.trim();
-      if (newName && newName !== day.name) {
-        updateProgramDay(day.id, { name: newName });
-      }
+      saveDayName(day.id, { silent: true });
     });
 
     Alert.alert('Saved', 'Training day labels have been updated.', [
@@ -139,14 +169,22 @@ export default function ProgramDaysSettingsScreen() {
                 editable={day.isActive}
               />
             </View>
-            {programDays.length > 1 && (
+            <View style={styles.dayActions}>
               <TouchableOpacity
-                onPress={() => handleRemoveDay(day.id, day.name)}
-                style={styles.removeButton}
+                onPress={() => handleSaveDay(day.id)}
+                style={styles.saveActionButton}
               >
-                <Feather name="trash-2" size={18} color="#ef4444" />
+                <Feather name="check" size={18} color={ACCENT} />
               </TouchableOpacity>
-            )}
+              {programDays.length > 1 && (
+                <TouchableOpacity
+                  onPress={() => handleRemoveDay(day.id, day.name)}
+                  style={styles.removeButton}
+                >
+                  <Feather name="trash-2" size={18} color="#ef4444" />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         ))}
 
@@ -210,6 +248,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  dayActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   checkbox: {
     padding: 4,
   },
@@ -250,6 +293,9 @@ const styles = StyleSheet.create({
   inputInactive: {
     backgroundColor: '#F5F5F5',
     color: '#999',
+  },
+  saveActionButton: {
+    padding: 8,
   },
   removeButton: {
     padding: 8,

@@ -21,6 +21,7 @@ type ProgramDaysContextValue = {
   updateProgramDay: (id: ProgramDayId, updates: Partial<Pick<ProgramDay, 'name' | 'isActive'>>) => void;
   getProgramDayById: (id: ProgramDayId) => ProgramDay | undefined;
   getProgramDayByIndex: (index: number) => ProgramDay | undefined;
+  getProgramDayForDate: (date: Date) => { programDay: ProgramDay | undefined; dayIndex: number };
 };
 
 const ProgramDaysContext = createContext<ProgramDaysContextValue | undefined>(undefined);
@@ -32,6 +33,9 @@ const DEFAULT_PROGRAM_DAYS: ProgramDay[] = [
   { id: 'day-4', index: 4, name: 'Legs', isActive: true },
   { id: 'day-5', index: 5, name: 'Accessories', isActive: true },
 ];
+
+const PROGRAM_START_DATE = new Date(2025, 11, 3);
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 export function ProgramDaysProvider({ children }: { children: ReactNode }) {
   const { currentUser } = useUser();
@@ -138,6 +142,27 @@ export function ProgramDaysProvider({ children }: { children: ReactNode }) {
     return programDays.find(d => d.index === index);
   };
 
+  const getProgramDayForDate = (date: Date): { programDay: ProgramDay | undefined; dayIndex: number } => {
+    const activeDays = programDays.filter(d => d.isActive).sort((a, b) => a.index - b.index);
+    if (activeDays.length === 0) {
+      return { programDay: undefined, dayIndex: 1 };
+    }
+
+    const normalizedDate = new Date(date);
+    normalizedDate.setHours(0, 0, 0, 0);
+
+    const normalizedStart = new Date(PROGRAM_START_DATE);
+    normalizedStart.setHours(0, 0, 0, 0);
+
+    const daysSinceStart = Math.floor(
+      (normalizedDate.getTime() - normalizedStart.getTime()) / MS_PER_DAY
+    );
+    const activeIndex = ((daysSinceStart % activeDays.length) + activeDays.length) % activeDays.length;
+    const day = activeDays[activeIndex];
+
+    return { programDay: day, dayIndex: day.index };
+  };
+
   return (
     <ProgramDaysContext.Provider
       value={{
@@ -147,6 +172,7 @@ export function ProgramDaysProvider({ children }: { children: ReactNode }) {
         updateProgramDay,
         getProgramDayById,
         getProgramDayByIndex,
+        getProgramDayForDate,
       }}
     >
       {children}

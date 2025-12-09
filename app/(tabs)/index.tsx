@@ -193,24 +193,16 @@ export default function HomeScreen() {
     : null;
 
   // ===== TODAY'S FOCUS CYCLE (5-DAY PROGRAM) =====
-  const { programDays, getProgramDayByIndex } = useProgramDays();
-  
-  // Anchor: Dec 3, 2025 = Day 1 (Chest & Tris)
-  const programStartDate = new Date(2025, 11, 3); // months are 0-based (11 = December)
+  const { getProgramDayForDate } = useProgramDays();
+  const { programDay: todayProgramDay, dayIndex: todayDayIndex } = getProgramDayForDate(today);
+  const { programDay: tomorrowProgramDay, dayIndex: tomorrowDayIndex } = getProgramDayForDate(tomorrowDate);
+  const todayFocus = { name: todayProgramDay?.name || `Day ${todayDayIndex}` };
+  const tomorrowFocus = { name: tomorrowProgramDay?.name || `Day ${tomorrowDayIndex}` };
+  const programStartDate = new Date(2025, 11, 3);
   const msPerDay = 1000 * 60 * 60 * 24;
   const daysSinceStart = Math.floor(
     (today.getTime() - programStartDate.getTime()) / msPerDay
   );
-  
-  // Only cycle through ACTIVE days
-  const activeDays = programDays.filter(d => d.isActive).sort((a, b) => a.index - b.index);
-  const todayDayIndex = activeDays.length > 0 ? activeDays[daysSinceStart % activeDays.length].index : 1;
-  const todayProgramDay = getProgramDayByIndex(todayDayIndex);
-  const todayFocus = { name: todayProgramDay?.name || `Day ${todayDayIndex}` };
-
-  const tomorrowDayIndex = activeDays.length > 0 ? activeDays[(daysSinceStart + 1) % activeDays.length].index : 1;
-  const tomorrowProgramDay = getProgramDayByIndex(tomorrowDayIndex);
-  const tomorrowFocus = { name: tomorrowProgramDay?.name || `Day ${tomorrowDayIndex}` };
 
   // ===== "DUE TODAY" LOGIC FOR PHOTOS AND WEIGH-IN =====
   const photosDueToday = ((daysSinceStart + 1) % 30) === 0;

@@ -64,7 +64,7 @@ const createEmptySlot = (id: string): WorkoutSlot => ({
 
 export default function WorkoutsScreen() {
   const router = useRouter();
-  const { programDays, getProgramDayByIndex } = useProgramDays();
+  const { programDays, getProgramDayForDate } = useProgramDays();
   const { addHistoryEventForToday } = useDayMetrics();
   const {
     getWorkoutsForDate,
@@ -85,13 +85,7 @@ export default function WorkoutsScreen() {
 
   const today = new Date();
   const todayDateKey = getDateKey(today);
-  
-  // Calculate today's program day index (1-based, cycling through ACTIVE program days only)
-  const activeDays = programDays.filter(d => d.isActive).sort((a, b) => a.index - b.index);
-  const startDate = new Date('2025-12-02');
-  const daysDiff = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-  const programDayIndex = activeDays.length > 0 ? activeDays[daysDiff % activeDays.length].index : 1;
-  const programDay = getProgramDayByIndex(programDayIndex);
+  const { programDay, dayIndex: programDayIndex } = getProgramDayForDate(today);
 
   // Get today's workouts from context
   const todayWorkouts = getWorkoutsForDate(todayDateKey);
@@ -190,7 +184,7 @@ export default function WorkoutsScreen() {
         addWorkout({
           dateKey: todayDateKey,
           programDayId: programDay.id,
-          programDayIndex: programDay.index,
+          programDayIndex,
           focusLabel: programDay.name,
           name: template.name,
           type: template.type,
@@ -504,7 +498,7 @@ export default function WorkoutsScreen() {
       addWorkout({
         dateKey: todayDateKey,
         programDayId: programDay.id,
-        programDayIndex: programDay.index,
+        programDayIndex,
         focusLabel: programDay.name,
         name: workoutName.trim(),
         type: workoutType,
@@ -554,7 +548,9 @@ export default function WorkoutsScreen() {
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           <View style={styles.todayInfo}>
             <Text style={styles.todayInfoText}>
-              {programDay ? `Today: Day ${programDay.index} \u2013 ${programDay.name}` : 'Today: Rest / Unassigned'}
+              {programDay
+                ? `Today: Day ${programDayIndex} \u2013 ${programDay.name}`
+                : `Today: Day ${programDayIndex} \u2013 Rest / Unassigned`}
             </Text>
             <TouchableOpacity
               style={styles.editDaysLink}
