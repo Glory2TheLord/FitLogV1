@@ -49,13 +49,13 @@ export default function HomeScreen() {
     dailyTotals,
     goodEatingStreak,
     evaluateTodayForStreak,
-    setGoodEatingStreak,
     setCheatUsedToday,
     setDailyTotals,
-    setMealSlots,
     mealSlots,
     cheatUsedToday,
     resetTodayMealCompletion,
+    mealTemplates,
+    resetCheatCycle,
   } = useMealTracking();
   const { preferences } = usePreferences();
   const { photoDays, isProgressPhotosRequiredOn } = usePhotoDays();
@@ -102,6 +102,11 @@ export default function HomeScreen() {
   const hasMetProteinGoal = dailyTotals.protein >= preferences.dailyProteinGoal;
   // Calculate days to cheat meal using preference interval and eating streak
   const daysToCheatMeal = Math.max(0, preferences.cheatMealIntervalDays - goodEatingStreak);
+  const hasCompletedCheatMealToday = mealSlots.some(slot => {
+    if (!slot.completed || !slot.templateId) return false;
+    const template = mealTemplates.find(t => t.id === slot.templateId);
+    return template?.category === 'cheat';
+  });
 
   // Weigh-in requirement/completion
   const hasWeighedInToday = (profile.weighIns || []).some(w => w.date.slice(0, 10) === todayDateKey);
@@ -290,37 +295,6 @@ export default function HomeScreen() {
   const formattedStepsWeek = stepsThisWeek.toLocaleString('en-US');
 
   // Dev-only reset handler
-  const handleDevReset = () => {
-    Alert.alert(
-      'Reset cheat-meal progress?',
-      "This will reset your good eating streak, days-to-cheat counter, and clear today's logged slots and trackers. This is intended for development/testing only.",
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Yes, reset',
-          style: 'destructive',
-          onPress: () => {
-            setGoodEatingStreak(0);
-            setCheatUsedToday(false);
-            setDailyTotals({ calories: 0, protein: 0 });
-            setMealSlots((prev) =>
-              prev.map((slot) => ({
-                ...slot,
-                templateId: null,
-                completed: false,
-              }))
-            );
-            resetTodayTrackingToDefaults();
-            clearWorkoutsForDate(todayDateKey);
-          },
-        },
-      ]
-    );
-  };
-
   // ===== GOAL ESTIMATION HELPER =====
   const recalculateEstimatedDaysToGoal = (entries: DayHistoryEntry[]) => {
     if (!goalWeight || !currentWeight) {
@@ -434,7 +408,11 @@ export default function HomeScreen() {
     if (!canMarkDayComplete) return;
 
     // 1. Update streak / days-to-cheat logic
-    evaluateTodayForStreak();
+    if (hasCompletedCheatMealToday) {
+      resetCheatCycle();
+    } else {
+      evaluateTodayForStreak();
+    }
 
     // 2. Log today and recalculate days/weeks to goal
     const entry = buildHistoryEntryForToday();
@@ -801,16 +779,6 @@ export default function HomeScreen() {
               <Text style={styles.markDayHint}>
                 Complete steps, calories, protein, meals, and at least one workout to mark the day complete.
               </Text>
-            )}
-
-            {/* ====== DEV RESET BUTTON ====== */}
-            {__DEV__ && (
-              <TouchableOpacity 
-                style={styles.devResetButton}
-                onPress={handleDevReset}
-              >
-                <Text style={styles.devResetButtonText}>DEV: Reset cheat progress</Text>
-              </TouchableOpacity>
             )}
 
             {/* ====== TODAY / TOMORROW FOCUS CARD ====== */}
@@ -1363,24 +1331,6 @@ const styles = StyleSheet.create({
     // Individual icon spacing handled by gap in parent
   },
 
-  // ===== DEV RESET BUTTON =====
-  devResetButton: {
-    backgroundColor: '#999999',
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    marginVertical: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#666666',
-  },
-  devResetButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
   overlay: {
     position: 'absolute',
     top: 0,

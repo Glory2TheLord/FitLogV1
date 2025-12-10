@@ -57,6 +57,7 @@ type MealTrackingContextType = {
   recalculateDailyTotals: () => void;
   evaluateTodayForStreak: () => void;
   resetTodayMealCompletion: () => void;
+  resetCheatCycle: () => void;
 };
 
 const MealTrackingContext = createContext<MealTrackingContextType | undefined>(undefined);
@@ -231,6 +232,10 @@ export function MealTrackingProvider({ children }: { children: ReactNode }) {
     setGoodEatingStreak((prev) => (isGoodDay ? prev + 1 : 0));
   };
 
+  const resetCheatCycle = () => {
+    setGoodEatingStreak(0);
+  };
+
   const resetTodayMealCompletion = () => {
     setMealSlots(prev =>
       prev.map(slot => ({
@@ -256,6 +261,7 @@ export function MealTrackingProvider({ children }: { children: ReactNode }) {
         recalculateDailyTotals,
         evaluateTodayForStreak,
         resetTodayMealCompletion,
+        resetCheatCycle,
       }}
     >
       {children}
