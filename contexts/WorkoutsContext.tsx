@@ -42,6 +42,7 @@ export type WorkoutEntry = {
   steps?: number;
   notes?: string;
   isCompleted: boolean;
+  completedAt?: string;
   createdAt: string;
 };
 
@@ -73,6 +74,7 @@ type WorkoutsContextValue = {
   hasWorkoutsForDate: (dateKey: string) => boolean;
   getTemplatesForProgramDay: (dayId: ProgramDayId) => WorkoutTemplate[];
   clearWorkoutsForDate: (dateKey: string) => void;
+  resetTodayWorkoutCompletion: (dateKey: string) => void;
 };
 
 const WorkoutsContext = createContext<WorkoutsContextValue | undefined>(undefined);
@@ -388,6 +390,24 @@ export function WorkoutsProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const resetTodayWorkoutCompletion = (dateKey: string) => {
+    setWorkoutsByDate(prev => {
+      const dateWorkouts = prev[dateKey];
+      if (!dateWorkouts) return prev;
+
+      const resetWorkouts = dateWorkouts.map(w => ({
+        ...w,
+        isCompleted: false,
+        completedAt: undefined,
+      }));
+
+      return {
+        ...prev,
+        [dateKey]: resetWorkouts,
+      };
+    });
+  };
+
   return (
     <WorkoutsContext.Provider
       value={{
@@ -410,6 +430,7 @@ export function WorkoutsProvider({ children }: { children: ReactNode }) {
         hasWorkoutsForDate,
         getTemplatesForProgramDay,
         clearWorkoutsForDate,
+        resetTodayWorkoutCompletion,
       }}
     >
       {children}

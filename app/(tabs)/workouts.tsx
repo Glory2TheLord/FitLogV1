@@ -116,7 +116,7 @@ export default function WorkoutsScreen() {
     } else {
       setWorkoutSlots([createEmptySlot('1')]);
     }
-  }, [todayWorkouts.length, todayDateKey]);
+  }, [todayWorkouts, todayDateKey]);
 
   // Template selection
   const [expandedSlotId, setExpandedSlotId] = useState<string | null>(null);

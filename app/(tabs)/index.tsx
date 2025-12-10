@@ -64,6 +64,7 @@ export default function HomeScreen() {
   const {
     getWorkoutsForDate,
     clearWorkoutsForDate,
+    resetTodayWorkoutCompletion,
   } = useWorkouts();
   
   const today = new Date();
@@ -426,9 +427,6 @@ export default function HomeScreen() {
     // Reset completion flags
     setPhotosComplete(false);
     setWeighInComplete(false);
-    
-    // Reset meal completion state for the new day while keeping selections
-    resetTodayMealCompletion();
   };
 
   // ===== MARK DAY COMPLETE HANDLER =====
@@ -455,6 +453,10 @@ export default function HomeScreen() {
         mealsCompleted: entry.mealsCompleted,
       },
     });
+
+    // Clear per-day completion flags (keep selections/workouts)
+    resetTodayMealCompletion();
+    resetTodayWorkoutCompletion(todayDateKey);
 
     // 3. Reset all daily state for tomorrow
     resetDailyState();
