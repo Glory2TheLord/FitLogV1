@@ -481,6 +481,8 @@ export default function HomeScreen() {
   const [waterInput, setWaterInput] = useState('');
   const [weighDialogVisible, setWeighDialogVisible] = useState(false);
   const [weighInput, setWeighInput] = useState('');
+  const [noteDialogVisible, setNoteDialogVisible] = useState(false);
+  const [noteInput, setNoteInput] = useState('');
 
   const closeAllDialogs = () => {
     setQuickAddVisible(false);
@@ -490,6 +492,8 @@ export default function HomeScreen() {
     setStepInput('');
     setWaterInput('');
     setWeighInput('');
+    setNoteDialogVisible(false);
+    setNoteInput('');
   };
 
   const handleWeighInConfirm = () => {
@@ -554,11 +558,22 @@ export default function HomeScreen() {
     closeAllDialogs();
   };
 
+  const handleAddNoteConfirm = () => {
+    const text = noteInput.trim();
+    if (text) {
+      addHistoryEventForToday({
+        type: 'dayNoteAdded',
+        summary: 'Note added',
+        details: { note: text },
+      });
+    }
+    closeAllDialogs();
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <FitLogHeader
         onSettingsPress={handleSettingsPress}
-        onPlusPress={() => setQuickAddVisible(true)}
       />
       
       <ScrollView
@@ -928,6 +943,15 @@ export default function HomeScreen() {
               <Text style={styles.quickAddButtonText}>Weigh in</Text>
             </TouchableOpacity>
             <TouchableOpacity
+              style={styles.quickAddButton}
+              onPress={() => {
+                setQuickAddVisible(false);
+                setNoteDialogVisible(true);
+              }}
+            >
+              <Text style={styles.quickAddButtonText}>Add Note</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={styles.quickAddCancel}
               onPress={() => setQuickAddVisible(false)}
             >
@@ -1005,6 +1029,32 @@ export default function HomeScreen() {
                 <Text style={styles.modalButtonSecondaryText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalButtonPrimary} onPress={handleWeighInConfirm}>
+                <Text style={styles.modalButtonPrimaryText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Add Note Dialog */}
+      {noteDialogVisible && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Add Note</Text>
+            <TextInput
+              style={[styles.modalInput, { minHeight: 100, textAlignVertical: 'top' }]}
+              placeholder="Type your note for today..."
+              placeholderTextColor="#9ca3af"
+              value={noteInput}
+              onChangeText={setNoteInput}
+              multiline
+              numberOfLines={4}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.modalButtonSecondary} onPress={closeAllDialogs}>
+                <Text style={styles.modalButtonSecondaryText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalButtonPrimary} onPress={handleAddNoteConfirm}>
                 <Text style={styles.modalButtonPrimaryText}>Save</Text>
               </TouchableOpacity>
             </View>

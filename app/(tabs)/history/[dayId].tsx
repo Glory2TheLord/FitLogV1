@@ -270,6 +270,27 @@ function renderTimelineRow(event: any) {
     );
   }
 
+  if (event.type === 'dayNoteAdded' && event.details) {
+    const noteText = event.details?.note || event.details?.text || event.summary;
+    return (
+      <>
+        <Text style={styles.timelineSummary}>Note added</Text>
+        {noteText ? <Text style={styles.timelineComment}>{noteText}</Text> : null}
+      </>
+    );
+  }
+
+  if (event.type === 'workoutTemplateUpdated' && event.details) {
+    const { workoutName, summary } = event.details as any;
+    const title = workoutName ? `Updated workout template for ${workoutName}` : 'Updated workout template';
+    return (
+      <>
+        <Text style={styles.timelineSummary}>{title}</Text>
+        {summary ? <Text style={styles.timelineComment}>{summary}</Text> : null}
+      </>
+    );
+  }
+
   if (event.type === 'workoutEdited' && event.details) {
     return (
       <>

@@ -22,7 +22,9 @@ export type DayHistoryEventType =
   | 'cheatMealLogged'
   | 'workoutNotesAdded'
   | 'workoutNotesUpdated'
+  | 'workoutTemplateUpdated'
   | 'workoutEdited'
+  | 'dayNoteAdded'
   | 'workoutNotes';
 
 export type DayHistoryEvent = {

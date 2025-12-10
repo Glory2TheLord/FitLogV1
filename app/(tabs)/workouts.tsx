@@ -235,7 +235,7 @@ export default function WorkoutsScreen() {
                   weight: template.defaultWeight ?? null,
                   minutes: template.defaultMinutes ?? null,
                   steps: template.defaultSteps ?? null,
-                  notes: slot.selectedWorkoutData?.notes ?? template.notes ?? '',
+                  notes: template.notes ?? '',
                 },
                 isCompleted: slot.isCompleted,
               }
@@ -381,7 +381,7 @@ export default function WorkoutsScreen() {
     setWorkoutReps(template.defaultReps?.toString() || '');
     setWorkoutWeight(template.defaultWeight?.toString() || '');
     setWorkoutSteps(template.defaultSteps?.toString() || '');
-    setWorkoutNotes(template.notes ?? '');
+    setWorkoutNotes('');
     setSelectedProgramDayIds(template.programDayIds || []);
     setShowAddModal(true);
     setExpandedSlotId(null);
@@ -401,6 +401,27 @@ export default function WorkoutsScreen() {
     setSelectedProgramDayIds([]);
     setEditingTemplateId(null);
     setShowAddModal(true);
+  };
+
+  const describeWorkoutTemplateChange = (oldTemplate: WorkoutTemplate | CustomWorkout | undefined, newTemplate: Partial<WorkoutTemplate>): string => {
+    if (!oldTemplate) return '';
+    const changes: string[] = [];
+
+    const addChange = (label: string, before: any, after: any, formatter?: (v: any) => string) => {
+      if (before === after) return;
+      const format = formatter ?? ((v: any) => (v === undefined || v === null || v === '' ? '—' : String(v)));
+      changes.push(`${label}: ${format(before)} \u2192 ${format(after)}`);
+    };
+
+    addChange('name', oldTemplate.name, newTemplate.name);
+    addChange('type', oldTemplate.type, newTemplate.type);
+    addChange('sets', oldTemplate.defaultSets, newTemplate.defaultSets);
+    addChange('reps', oldTemplate.defaultReps, newTemplate.defaultReps);
+    addChange('weight', oldTemplate.defaultWeight, newTemplate.defaultWeight, v => (v === undefined || v === null ? '—' : `${v} lb`));
+    addChange('minutes', oldTemplate.defaultMinutes, newTemplate.defaultMinutes);
+    addChange('steps', oldTemplate.defaultSteps, newTemplate.defaultSteps);
+
+    return changes.join(', ');
   };
 
   const handleSaveWorkout = () => {
@@ -461,6 +482,19 @@ export default function WorkoutsScreen() {
       const previous = isCustom
         ? allCustomWorkouts.find(c => c.id === editingTemplateId)
         : workoutTemplates.find(t => t.id === editingTemplateId);
+      const proposedTemplate = {
+        ...(previous || {}),
+        name: workoutName.trim(),
+        type: workoutType,
+        defaultMinutes: minutesNumber,
+        defaultSets: setsNumber,
+        defaultReps: repsNumber,
+        defaultWeight: weightNumber,
+        defaultSteps: stepsNumber,
+        notes: trimmedNotes,
+        programDayIds: selectedProgramDayIds,
+      } as WorkoutTemplate;
+
       if (isCustom) {
         updateCustomWorkout(editingTemplateId, {
           name: workoutName.trim(),
@@ -497,14 +531,18 @@ export default function WorkoutsScreen() {
         defaultSteps: stepsNumber,
         programDayIds: selectedProgramDayIds,
       };
-      if (isCustom && previous) {
+
+      const changeSummary = describeWorkoutTemplateChange(previous, proposedTemplate);
+      if (previous && changeSummary) {
         addHistoryEventForToday({
-          type: 'workoutEdited',
-          summary: `Edited workout: ${updatedWorkout.name}`,
+          type: 'workoutTemplateUpdated',
+          summary: `Updated workout template for ${updatedWorkout.name}`,
           details: {
             workoutId: editingTemplateId,
+            workoutName: updatedWorkout.name,
             previous,
             updated: updatedWorkout,
+            summary: changeSummary,
           },
         });
       }
@@ -928,16 +966,20 @@ export default function WorkoutsScreen() {
                 <Text style={styles.modalHelperText}>* Time is required for cardio</Text>
               )}
 
-              <Text style={styles.modalLabel}>Notes</Text>
-              <TextInput
-                style={[styles.modalInput, styles.modalInputMultiline]}
-                placeholder="Any additional notes..."
-                placeholderTextColor="#999"
-                multiline
-                numberOfLines={3}
-                value={workoutNotes}
-                onChangeText={setWorkoutNotes}
-              />
+              {!isCustomWorkout && !editingTemplateId && (
+                <>
+                  <Text style={styles.modalLabel}>Notes</Text>
+                  <TextInput
+                    style={[styles.modalInput, styles.modalInputMultiline]}
+                    placeholder="Any additional notes..."
+                    placeholderTextColor="#999"
+                    multiline
+                    numberOfLines={3}
+                    value={workoutNotes}
+                    onChangeText={setWorkoutNotes}
+                  />
+                </>
+              )}
 
               {isCustomWorkout && (
                 <>

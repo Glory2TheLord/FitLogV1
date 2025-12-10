@@ -1,15 +1,17 @@
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import React from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useQuickActions } from '@/contexts/QuickActionsContext';
 
 const ACCENT = '#f97316';
 
 type FitLogHeaderProps = {
   onSettingsPress?: () => void;
-  onPlusPress?: () => void;
 };
 
-export default function FitLogHeader({ onSettingsPress, onPlusPress }: FitLogHeaderProps) {
+export default function FitLogHeader({ onSettingsPress }: FitLogHeaderProps) {
+  const { openQuickActions } = useQuickActions();
+
   const handlePress = () => {
     console.log('Gear button pressed in FitLogHeader');
     console.log('onSettingsPress callback exists:', !!onSettingsPress);
@@ -50,7 +52,7 @@ export default function FitLogHeader({ onSettingsPress, onPlusPress }: FitLogHea
         <TouchableOpacity
           style={styles.headerButton}
           activeOpacity={0.9}
-          onPress={onPlusPress}
+          onPress={openQuickActions}
         >
           <Feather
             name="plus"

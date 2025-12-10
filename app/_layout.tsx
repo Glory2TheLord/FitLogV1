@@ -13,6 +13,7 @@ import { PreferencesProvider } from '@/contexts/PreferencesContext';
 import { UserProvider, useUser } from '@/contexts/UserContext';
 import { UserProfileProvider } from '@/contexts/UserProfileContext';
 import { WorkoutsProvider } from '@/contexts/WorkoutsContext';
+import { QuickActionsProvider } from '@/contexts/QuickActionsContext';
 
 // Login/profile selection screen
 function AppShell() {
@@ -87,7 +88,9 @@ export default function RootLayout() {
               <MealTrackingProvider>
                 <WorkoutsProvider>
                   <PhotoDayProvider>
-                    <AppShell />
+                    <QuickActionsProvider>
+                      <AppShell />
+                    </QuickActionsProvider>
                   </PhotoDayProvider>
                 </WorkoutsProvider>
               </MealTrackingProvider>
