@@ -20,8 +20,10 @@ export type DayHistoryEventType =
   | 'photosAllCompleted'
   | 'waterLogged'
   | 'cheatMealLogged'
+  | 'workoutNotesAdded'
   | 'workoutNotesUpdated'
-  | 'workoutEdited';
+  | 'workoutEdited'
+  | 'workoutNotes';
 
 export type DayHistoryEvent = {
   id: string;

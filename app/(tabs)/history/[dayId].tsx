@@ -250,13 +250,22 @@ function renderTimelineRow(event: any) {
     );
   }
 
-  if (event.type === 'workoutNotesUpdated' && event.details) {
-    const { newNotes } = event.details as any;
-    if (!newNotes) return null;
+  if ((event.type === 'workoutNotesAdded' || event.type === 'workoutNotesUpdated' || event.type === 'workoutNotes') && event.details) {
+    const { newNotes, notes, workoutName } = event.details as any;
+    const noteBody = newNotes ?? notes;
+    if (!noteBody) return null;
+    const headline =
+      event.type === 'workoutNotesUpdated'
+        ? workoutName
+          ? `Notes updated for ${workoutName}`
+          : 'Notes updated for workout'
+        : workoutName
+        ? `Notes added to ${workoutName}`
+        : 'Notes added to workout';
     return (
       <>
-        <Text style={styles.timelineSummary}>Updated workout notes</Text>
-        <Text style={styles.timelineComment}>{newNotes}</Text>
+        <Text style={styles.timelineSummary}>{headline}</Text>
+        <Text style={styles.timelineComment}>{noteBody}</Text>
       </>
     );
   }

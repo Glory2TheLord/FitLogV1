@@ -23,6 +23,7 @@ export type WorkoutTemplate = {
   defaultWeight?: number;
   defaultSteps?: number;
   programDayIds: ProgramDayId[];
+  notes?: string;
 };
 
 export type CustomWorkout = WorkoutTemplate;
@@ -127,6 +128,7 @@ export function WorkoutsProvider({ children }: { children: ReactNode }) {
             ...t,
             programDayIds: t.programDayIds || [],
             defaultSteps: t.defaultSteps ?? 0,
+            notes: t.notes ?? '',
           }));
           setWorkoutTemplates(migratedTemplates);
         } else {
@@ -139,6 +141,7 @@ export function WorkoutsProvider({ children }: { children: ReactNode }) {
             ...c,
             programDayIds: c.programDayIds || [],
             defaultSteps: c.defaultSteps ?? c.steps ?? 0,
+            notes: c.notes ?? '',
           }));
           setCustomWorkouts(migratedCustom);
         } else {
@@ -324,6 +327,7 @@ export function WorkoutsProvider({ children }: { children: ReactNode }) {
     const newTemplate: WorkoutTemplate = {
       ...template,
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      notes: template.notes ?? '',
     };
     setWorkoutTemplates(prev => [...prev, newTemplate]);
   };
@@ -345,6 +349,7 @@ export function WorkoutsProvider({ children }: { children: ReactNode }) {
     const created: CustomWorkout = {
       ...workout,
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      notes: workout.notes ?? '',
     };
     setCustomWorkouts(prev => [...prev, created]);
     return created;

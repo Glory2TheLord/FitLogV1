@@ -13,7 +13,9 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     Alert,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -95,27 +97,48 @@ export default function WorkoutsScreen() {
 
   // Load existing workouts into slots on mount and when todayWorkouts changes
   useEffect(() => {
-    if (todayWorkouts.length > 0) {
-      const loadedSlots: WorkoutSlot[] = todayWorkouts.map((workout, index) => ({
-        id: (index + 1).toString(),
-        selectedWorkoutId: workout.id,
-        selectedWorkoutData: {
-          name: workout.name,
-          type: workout.type,
-          sets: workout.sets ?? null,
-          reps: workout.reps ?? null,
-          weight: workout.weight ?? null,
-          minutes: workout.minutes ?? null,
-          steps: workout.steps ?? null,
-          notes: workout.notes,
-        },
-        isCompleted: workout.isCompleted,
-      }));
-      
-      setWorkoutSlots(loadedSlots);
-    } else {
-      setWorkoutSlots([createEmptySlot('1')]);
-    }
+    const loadedSlots: WorkoutSlot[] =
+      todayWorkouts.length > 0
+        ? todayWorkouts.map((workout, index) => ({
+            id: (index + 1).toString(),
+            selectedWorkoutId: workout.id,
+            selectedWorkoutData: {
+              name: workout.name,
+              type: workout.type,
+              sets: workout.sets ?? null,
+              reps: workout.reps ?? null,
+              weight: workout.weight ?? null,
+              minutes: workout.minutes ?? null,
+              steps: workout.steps ?? null,
+              notes: workout.notes,
+            },
+            isCompleted: workout.isCompleted,
+          }))
+        : [createEmptySlot('1')];
+
+    setWorkoutSlots(prev => {
+      const sameLength = prev.length === loadedSlots.length;
+      const isSame =
+        sameLength &&
+        prev.every((slot, idx) => {
+          const next = loadedSlots[idx];
+          return (
+            slot.id === next.id &&
+            slot.selectedWorkoutId === next.selectedWorkoutId &&
+            slot.isCompleted === next.isCompleted &&
+            slot.selectedWorkoutData?.name === next.selectedWorkoutData?.name &&
+            slot.selectedWorkoutData?.type === next.selectedWorkoutData?.type &&
+            slot.selectedWorkoutData?.sets === next.selectedWorkoutData?.sets &&
+            slot.selectedWorkoutData?.reps === next.selectedWorkoutData?.reps &&
+            slot.selectedWorkoutData?.weight === next.selectedWorkoutData?.weight &&
+            slot.selectedWorkoutData?.minutes === next.selectedWorkoutData?.minutes &&
+            slot.selectedWorkoutData?.steps === next.selectedWorkoutData?.steps &&
+            slot.selectedWorkoutData?.notes === next.selectedWorkoutData?.notes
+          );
+        });
+
+      return isSame ? prev : loadedSlots;
+    });
   }, [todayWorkouts, todayDateKey]);
 
   // Template selection
@@ -193,7 +216,7 @@ export default function WorkoutsScreen() {
           reps: template.defaultReps,
           weight: template.defaultWeight,
           steps: template.defaultSteps,
-          notes: '',
+          notes: template.notes ?? '',
         });
       }
 
@@ -212,7 +235,7 @@ export default function WorkoutsScreen() {
                   weight: template.defaultWeight ?? null,
                   minutes: template.defaultMinutes ?? null,
                   steps: template.defaultSteps ?? null,
-                  notes: slot.selectedWorkoutData?.notes ?? '',
+                  notes: slot.selectedWorkoutData?.notes ?? template.notes ?? '',
                 },
                 isCompleted: slot.isCompleted,
               }
@@ -358,7 +381,7 @@ export default function WorkoutsScreen() {
     setWorkoutReps(template.defaultReps?.toString() || '');
     setWorkoutWeight(template.defaultWeight?.toString() || '');
     setWorkoutSteps(template.defaultSteps?.toString() || '');
-    setWorkoutNotes('');
+    setWorkoutNotes(template.notes ?? '');
     setSelectedProgramDayIds(template.programDayIds || []);
     setShowAddModal(true);
     setExpandedSlotId(null);
@@ -397,6 +420,8 @@ export default function WorkoutsScreen() {
       return;
     }
 
+    const trimmedNotes = workoutNotes.trim();
+
     if (editingWorkoutId) {
       const prevEntry = todayWorkouts.find(w => w.id === editingWorkoutId);
       const previousNotes = prevEntry?.notes ?? '';
@@ -409,13 +434,20 @@ export default function WorkoutsScreen() {
         reps: repsNumber,
         weight: weightNumber,
         steps: stepsNumber,
-        notes: workoutNotes.trim() || undefined,
+        notes: trimmedNotes || undefined,
       });
-      const newNotes = workoutNotes.trim() || '';
+      const newNotes = trimmedNotes || '';
       if (previousNotes !== newNotes) {
+        const noteEventType =
+          (!previousNotes || previousNotes.trim().length === 0) && newNotes
+            ? 'workoutNotesAdded'
+            : 'workoutNotesUpdated';
         addHistoryEventForToday({
-          type: 'workoutNotesUpdated',
-          summary: `Updated notes for workout: ${prevEntry?.name ?? workoutName.trim()}`,
+          type: noteEventType,
+          summary:
+            noteEventType === 'workoutNotesUpdated'
+              ? `Notes updated for ${prevEntry?.name ?? workoutName.trim()}`
+              : `Notes added to ${prevEntry?.name ?? workoutName.trim()}`,
           details: {
             workoutId: editingWorkoutId,
             workoutName: prevEntry?.name ?? workoutName.trim(),
@@ -438,6 +470,7 @@ export default function WorkoutsScreen() {
           defaultReps: repsNumber,
           defaultWeight: weightNumber,
           defaultSteps: stepsNumber,
+          notes: trimmedNotes,
           programDayIds: selectedProgramDayIds,
         });
       } else {
@@ -449,6 +482,7 @@ export default function WorkoutsScreen() {
           defaultReps: repsNumber,
           defaultWeight: weightNumber,
           defaultSteps: stepsNumber,
+          notes: trimmedNotes,
           programDayIds: selectedProgramDayIds,
         });
       }
@@ -490,6 +524,7 @@ export default function WorkoutsScreen() {
           defaultReps: repsNumber,
           defaultWeight: weightNumber,
           defaultSteps: stepsNumber,
+          notes: trimmedNotes,
           programDayIds: selectedProgramDayIds,
         });
       }
@@ -507,8 +542,18 @@ export default function WorkoutsScreen() {
         reps: repsNumber ?? undefined,
         weight: weightNumber ?? undefined,
         steps: stepsNumber ?? undefined,
-        notes: workoutNotes.trim() || undefined,
+        notes: trimmedNotes || undefined,
       });
+      if (trimmedNotes) {
+        addHistoryEventForToday({
+          type: 'workoutNotesAdded',
+          summary: `Notes added to ${workoutName.trim()}`,
+          details: {
+            workoutName: workoutName.trim(),
+            notes: trimmedNotes,
+          },
+        });
+      }
     }
 
     // Reset and close
@@ -644,6 +689,9 @@ export default function WorkoutsScreen() {
                       {getWorkoutSummary(slot.selectedWorkoutData)}
                     </Text>
                   )}
+                  {slot.selectedWorkoutData?.notes ? (
+                    <Text style={styles.notesText}>{slot.selectedWorkoutData.notes}</Text>
+                  ) : null}
 
                   {/* Dropdown options */}
                   {isExpanded && (
@@ -767,8 +815,17 @@ export default function WorkoutsScreen() {
       {/* Add/Edit Workout Modal */}
       <Modal visible={showAddModal} animationType="slide" transparent onRequestClose={() => setShowAddModal(false)}>
         <View style={styles.modalBackdrop}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 60}
+            style={{ flex: 1 }}
+          >
           <View style={styles.modalContent}>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.modalScrollContent}
+            >
               <Text style={styles.modalTitle}>
                 {editingWorkoutId
                   ? 'Edit Workout'
@@ -925,6 +982,7 @@ export default function WorkoutsScreen() {
               </View>
             </ScrollView>
           </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </SafeAreaView>
@@ -1007,6 +1065,11 @@ const styles = StyleSheet.create({
     marginTop: 6,
     color: '#4b5563',
     fontSize: 13,
+  },
+  notesText: {
+    marginTop: 6,
+    color: '#475569',
+    fontSize: 12,
   },
   workoutSlot: {
     backgroundColor: '#FFFFFF',
@@ -1170,6 +1233,9 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: 24,
     maxHeight: '90%',
+  },
+  modalScrollContent: {
+    paddingBottom: 32,
   },
   modalTitle: {
     fontSize: 20,
