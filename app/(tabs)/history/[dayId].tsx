@@ -240,6 +240,26 @@ function renderTimelineRow(event: any) {
     );
   }
 
+  if (event.type === 'stepsAddedManual' && event.details) {
+    const { delta, current } = event.details as any;
+    return (
+      <>
+        <Text style={styles.timelineSummary}>Steps added manually</Text>
+        <Text style={styles.timelineComment}>+{Number(delta || 0).toLocaleString('en-US')} (total {Number(current || 0).toLocaleString('en-US')})</Text>
+      </>
+    );
+  }
+
+  if (event.type === 'stepsUpdatedFromFitbit' && event.details) {
+    const { delta, current } = event.details as any;
+    return (
+      <>
+        <Text style={styles.timelineSummary}>Steps updated from Fitbit</Text>
+        <Text style={styles.timelineComment}>+{Number(delta || 0).toLocaleString('en-US')} (total {Number(current || 0).toLocaleString('en-US')})</Text>
+      </>
+    );
+  }
+
   if (event.type === 'goalWeightReached' && event.details) {
     const { weightLbs, goalWeightLbs } = event.details as any;
     return (

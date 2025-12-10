@@ -14,7 +14,7 @@ const QuickActionsContext = createContext<QuickActionsContextValue | undefined>(
 const ACCENT = '#f97316';
 
 export function QuickActionsProvider({ children }: { children: ReactNode }) {
-  const { addSteps, stepsToday, addWater, waterLiters, addHistoryEventForToday } = useDayMetrics();
+  const { addSteps, stepsToday, addWater, waterLiters, addHistoryEventForToday, setStepsToday } = useDayMetrics();
   const { preferences } = usePreferences();
   const { recordWeighIn } = useUserProfile();
 
@@ -39,23 +39,38 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
     setWaterInput('');
     setWeighInput('');
     setNoteInput('');
+    setStepMode('fitbit');
   };
 
+  const [stepMode, setStepMode] = useState<'fitbit' | 'manual'>('fitbit');
+
   const handleAddStepsConfirm = () => {
-    const amount = Number(stepInput);
-    if (Number.isFinite(amount) && amount > 0) {
-      const prevSteps = stepsToday;
+    const current = stepsToday;
+    const parsed = Number(stepInput);
+
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      closeAllDialogs();
+      return;
+    }
+
+    if (stepMode === 'manual') {
+      const amount = parsed;
+      if (amount <= 0) {
+        closeAllDialogs();
+        return;
+      }
+      const prevSteps = current;
       const nextSteps = prevSteps + amount;
       const stepGoal = preferences.dailyStepGoal;
       addSteps(amount);
       addHistoryEventForToday({
-        type: 'stepsLogged',
-        summary: `Logged ${amount} steps (total ${nextSteps}/${stepGoal})`,
+        type: 'stepsAddedManual',
+        summary: 'Steps added manually',
         details: {
           previous: prevSteps,
           current: nextSteps,
-          stepGoal,
           delta: amount,
+          stepGoal,
           source: 'manual',
         },
       });
@@ -70,7 +85,53 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
           },
         });
       }
+      closeAllDialogs();
+      return;
     }
+
+    // Fitbit mode
+    const fitbitTotal = parsed;
+    const diff = fitbitTotal - current;
+
+    if (diff === 0) {
+      closeAllDialogs();
+      return;
+    }
+
+    const prevSteps = current;
+    const nextSteps = fitbitTotal;
+    const stepGoal = preferences.dailyStepGoal;
+
+    if (diff > 0) {
+      addSteps(diff);
+    } else {
+      // Need to allow lowering; set directly
+      setStepsToday(fitbitTotal);
+    }
+
+    addHistoryEventForToday({
+      type: 'stepsUpdatedFromFitbit',
+      summary: 'Steps updated from Fitbit',
+      details: {
+        previous: prevSteps,
+        current: nextSteps,
+        delta: diff,
+        stepGoal,
+        source: 'fitbit',
+      },
+    });
+    if (prevSteps < stepGoal && nextSteps >= stepGoal) {
+      addHistoryEventForToday({
+        type: 'stepGoalReached',
+        summary: `Reached step goal: ${nextSteps}/${stepGoal}`,
+        details: {
+          previous: prevSteps,
+          current: nextSteps,
+          stepGoal,
+        },
+      });
+    }
+
     closeAllDialogs();
   };
 
@@ -180,11 +241,29 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
       {stepsDialogVisible && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>How many steps do you want to add to today?</Text>
+            <Text style={styles.modalTitle}>Update steps</Text>
+            <View style={styles.toggleRow}>
+              <TouchableOpacity
+                style={[styles.toggleButton, stepMode === 'fitbit' && styles.toggleButtonActive]}
+                onPress={() => setStepMode('fitbit')}
+              >
+                <Text style={[styles.toggleButtonText, stepMode === 'fitbit' && styles.toggleButtonTextActive]}>Fitbit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleButton, stepMode === 'manual' && styles.toggleButtonActive]}
+                onPress={() => setStepMode('manual')}
+              >
+                <Text style={[styles.toggleButtonText, stepMode === 'manual' && styles.toggleButtonTextActive]}>Manual</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalHelper}>Current FitLog steps: {stepsToday.toLocaleString('en-US')}</Text>
+            <Text style={styles.modalLabel}>
+              {stepMode === 'fitbit' ? 'Fitbit steps right now' : 'Steps to add manually'}
+            </Text>
             <TextInput
               style={styles.modalInput}
               keyboardType="numeric"
-              placeholder="e.g. 1000"
+              placeholder={stepMode === 'fitbit' ? 'e.g. 8430' : 'e.g. 1000'}
               placeholderTextColor="#9ca3af"
               value={stepInput}
               onChangeText={setStepInput}
@@ -371,6 +450,20 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 12,
   },
+  modalHelper: {
+    fontSize: 13,
+    color: '#4B5563',
+    marginBottom: 8,
+  },
+  modalLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#666666',
+    marginBottom: 6,
+    marginTop: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   modalInput: {
     borderWidth: 1.5,
     borderColor: '#E5E5E5',
@@ -385,6 +478,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     marginTop: 16,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#E5E5E5',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+  },
+  toggleButtonActive: {
+    borderColor: ACCENT,
+    backgroundColor: '#FFF3E9',
+  },
+  toggleButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#4B5563',
+  },
+  toggleButtonTextActive: {
+    color: ACCENT,
   },
   modalButtonPrimary: {
     flex: 1,
