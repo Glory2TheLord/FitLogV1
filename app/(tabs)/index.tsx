@@ -54,7 +54,8 @@ export default function HomeScreen() {
     setDailyTotals,
     setMealSlots,
     mealSlots,
-    cheatUsedToday
+    cheatUsedToday,
+    resetTodayMealCompletion,
   } = useMealTracking();
   const { preferences } = usePreferences();
   const { photoDays, isProgressPhotosRequiredOn } = usePhotoDays();
@@ -426,14 +427,8 @@ export default function HomeScreen() {
     setPhotosComplete(false);
     setWeighInComplete(false);
     
-    // Reset meal slots for the new day
-    setMealSlots((prev) =>
-      prev.map((slot) => ({
-        ...slot,
-        templateId: null,
-        completed: false,
-      }))
-    );
+    // Reset meal completion state for the new day while keeping selections
+    resetTodayMealCompletion();
   };
 
   // ===== MARK DAY COMPLETE HANDLER =====

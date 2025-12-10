@@ -51,7 +51,14 @@ export default function HistoryDayDetailScreen() {
         <View style={styles.pageTitleRow}>
           <Text style={styles.pageTitle}>History Detail</Text>
           <Text style={styles.date}>{formattedDate}</Text>
-          <Text style={styles.status}>{entry.isDayComplete ? 'Day complete ✅' : 'Day not complete'}</Text>
+          <Text
+            style={[
+              styles.status,
+              entry.isDayComplete ? styles.statusComplete : styles.statusIncomplete,
+            ]}
+          >
+            {entry.isDayComplete ? 'Day complete' : 'Day incomplete'}
+          </Text>
         </View>
 
         <View style={styles.card}>
@@ -306,9 +313,14 @@ const styles = StyleSheet.create({
   },
   status: {
     fontSize: 14,
-    color: '#16a34a',
     marginTop: 4,
     fontWeight: '600',
+  },
+  statusComplete: {
+    color: '#16a34a',
+  },
+  statusIncomplete: {
+    color: '#9ca3af',
   },
   card: {
     backgroundColor: '#FFFFFF',

@@ -88,7 +88,14 @@ export default function HistoryScreen() {
                   <View style={styles.cardHeader}>
                     <Text style={styles.cardDate}>{formatDate(item.id)}</Text>
                   </View>
-                  <Text style={styles.cardStatus}>{item.isDayComplete ? 'Day complete' : 'Incomplete'}</Text>
+                  <Text
+                    style={[
+                      styles.cardStatus,
+                      item.isDayComplete ? styles.cardStatusComplete : styles.cardStatusIncomplete,
+                    ]}
+                  >
+                    {item.isDayComplete ? 'Day complete' : 'Day incomplete'}
+                  </Text>
                   <Text style={styles.cardSummary}>
                     Steps: {item.steps}/{item.stepGoal} · Protein: {item.protein}/{item.proteinGoal}
                   </Text>
@@ -223,8 +230,13 @@ const styles = StyleSheet.create({
   cardStatus: {
     marginTop: 6,
     fontSize: 14,
-    color: '#16a34a',
     fontWeight: '600',
+  },
+  cardStatusComplete: {
+    color: '#16a34a',
+  },
+  cardStatusIncomplete: {
+    color: '#9ca3af',
   },
   cardSummary: {
     marginTop: 6,
