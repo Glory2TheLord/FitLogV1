@@ -4,7 +4,7 @@
     "slug": "FitLogV1",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/fitlog-icon.png",
+    "icon": "./assets/fitlog-log.png",
     "scheme": "fitlogv1",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,7 +13,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/fitlog-icon.png",
+        "foregroundImage": "./assets/fitlog-log.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
