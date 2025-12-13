@@ -88,14 +88,35 @@ export default function HistoryScreen() {
                   <View style={styles.cardHeader}>
                     <Text style={styles.cardDate}>{formatDate(item.id)}</Text>
                   </View>
-                  <Text
-                    style={[
-                      styles.cardStatus,
-                      item.isDayComplete ? styles.cardStatusComplete : styles.cardStatusIncomplete,
-                    ]}
-                  >
-                    {item.isDayComplete ? 'Day complete' : 'Day incomplete'}
-                  </Text>
+                  {(() => {
+                    const allGoalsReached = item.allGoalsReached ?? item.isDayComplete;
+                    const missedGoals = item.missedGoals ?? [];
+                    const statusText = !item.isDayComplete
+                      ? 'Day incomplete'
+                      : allGoalsReached
+                      ? 'Day complete'
+                      : 'Day complete (goals missed)';
+                    const statusStyle = !item.isDayComplete
+                      ? styles.cardStatusIncomplete
+                      : allGoalsReached
+                      ? styles.cardStatusComplete
+                      : styles.cardStatusPartial;
+                    return (
+                      <>
+                        <Text
+                          style={[
+                            styles.cardStatus,
+                            statusStyle,
+                          ]}
+                        >
+                          {statusText}
+                        </Text>
+                        {!allGoalsReached && item.isDayComplete && missedGoals.length > 0 && (
+                          <Text style={styles.cardMissed}>Missed: {missedGoals.join(', ')}</Text>
+                        )}
+                      </>
+                    );
+                  })()}
                   <Text style={styles.cardSummary}>
                     Steps: {item.steps}/{item.stepGoal} · Protein: {item.protein}/{item.proteinGoal}
                   </Text>
@@ -235,8 +256,17 @@ const styles = StyleSheet.create({
   cardStatusComplete: {
     color: '#16a34a',
   },
+  cardStatusPartial: {
+    color: '#f97316',
+  },
   cardStatusIncomplete: {
     color: '#9ca3af',
+  },
+  cardMissed: {
+    marginTop: 2,
+    fontSize: 13,
+    color: '#f97316',
+    fontWeight: '600',
   },
   cardSummary: {
     marginTop: 6,

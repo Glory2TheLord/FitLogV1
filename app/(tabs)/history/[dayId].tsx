@@ -44,6 +44,13 @@ export default function HistoryDayDetailScreen() {
     );
   }
 
+  const allGoalsReached = entry.allGoalsReached ?? entry.isDayComplete;
+  const statusText = !entry.isDayComplete
+    ? 'Day incomplete'
+    : allGoalsReached
+    ? 'Day complete'
+    : 'Day complete (goals missed)';
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <FitLogHeader onSettingsPress={() => router.push('/settings')} />
@@ -54,11 +61,14 @@ export default function HistoryDayDetailScreen() {
           <Text
             style={[
               styles.status,
-              entry.isDayComplete ? styles.statusComplete : styles.statusIncomplete,
+              !entry.isDayComplete ? styles.statusIncomplete : allGoalsReached ? styles.statusComplete : styles.statusPartial,
             ]}
           >
-            {entry.isDayComplete ? 'Day complete' : 'Day incomplete'}
+            {statusText}
           </Text>
+          {entry.isDayComplete && !allGoalsReached && (entry.missedGoals ?? []).length > 0 && (
+            <Text style={styles.statusMissed}>Missed: {(entry.missedGoals ?? []).join(', ')}</Text>
+          )}
         </View>
 
         <View style={styles.card}>
@@ -160,6 +170,17 @@ function renderTimelineComment(details: any) {
 
 function renderTimelineRow(event: any) {
   const details = event.details || {};
+
+  if (event.type === 'markDayComplete') {
+    const missed = Array.isArray(details?.missedGoals) ? details.missedGoals : [];
+    const missedText = missed.length > 0 ? `Missed goals: ${missed.join(', ')}` : null;
+    return (
+      <>
+        <Text style={styles.timelineSummary}>{event.summary || 'Marked day complete'}</Text>
+        {missedText ? <Text style={styles.timelineComment}>{missedText}</Text> : null}
+      </>
+    );
+  }
 
   if (event.type === 'mealCompleted' || event.type === 'mealsAllCompleted') {
     const mealName = details?.mealName ?? event.summary ?? 'Meal';
@@ -369,8 +390,17 @@ const styles = StyleSheet.create({
   statusComplete: {
     color: '#16a34a',
   },
+  statusPartial: {
+    color: '#f97316',
+  },
   statusIncomplete: {
     color: '#9ca3af',
+  },
+  statusMissed: {
+    fontSize: 13,
+    color: '#f97316',
+    marginTop: 2,
+    fontWeight: '600',
   },
   card: {
     backgroundColor: '#FFFFFF',

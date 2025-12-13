@@ -3,6 +3,31 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { useUser } from './UserContext';
 
+export type EvaluateTodayGoalsInput = {
+  stepsToday: number;
+  stepGoal: number;
+  calories: number;
+  calorieGoal: number;
+  protein: number;
+  proteinGoal: number;
+  water: number;
+  waterGoal: number;
+  workoutsCompleted: number;
+  mealsCompleted: number;
+  mealsPlanned: number;
+  weighInRequired: boolean;
+  hasWeighedInToday: boolean;
+  photosRequired: boolean;
+  hasCompletedPhotosToday: boolean;
+  isCheatMealDay: boolean;
+  hasCompletedCheatMeal: boolean;
+};
+
+export type EvaluateTodayGoalsResult = {
+  allGoalsReached: boolean;
+  missedGoals: string[];
+};
+
 export type DayHistoryEventType =
   | 'markDayComplete'
   | 'goalsChanged'
@@ -49,6 +74,8 @@ export type DayHistoryEntry = {
   id: string; // date key, e.g. "2025-12-08"
   dateISO: string; // full ISO string for that day
   isDayComplete: boolean;
+  allGoalsReached?: boolean;
+  missedGoals?: string[];
 
   steps: number;
   stepGoal: number;
@@ -98,6 +125,7 @@ type DayMetricsContextValue = {
   addHistoryEventForToday: (event: Omit<DayHistoryEvent, 'id' | 'timestampISO'>) => void;
   getHistory: () => DayHistoryEntry[];
   getHistoryEntryById: (id: string) => DayHistoryEntry | undefined;
+  evaluateTodayGoals: (input: EvaluateTodayGoalsInput) => EvaluateTodayGoalsResult;
 };
 
 const DayMetricsContext = createContext<DayMetricsContextValue | undefined>(undefined);
@@ -110,6 +138,62 @@ function getTodayKey() {
   const month = String(today.getMonth() + 1).padStart(2, '0');
   const day = String(today.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function normalizeHistoryEntry(entry: DayHistoryEntry): DayHistoryEntry {
+  return {
+    ...entry,
+    allGoalsReached: entry.allGoalsReached ?? entry.isDayComplete ?? false,
+    missedGoals: entry.missedGoals ?? [],
+    events: entry.events ?? [],
+  };
+}
+
+export function evaluateTodayGoals(input: EvaluateTodayGoalsInput): EvaluateTodayGoalsResult {
+  const missedGoals: string[] = [];
+
+  if (!(input.stepsToday >= input.stepGoal)) {
+    missedGoals.push('steps');
+  }
+
+  if (!(input.calories > 0 && input.calories <= input.calorieGoal)) {
+    missedGoals.push('calories');
+  }
+
+  if (!(input.protein >= input.proteinGoal)) {
+    missedGoals.push('protein');
+  }
+
+  const mealsGoalMet =
+    input.mealsPlanned === 0 ? true : input.mealsCompleted >= input.mealsPlanned;
+  if (!mealsGoalMet) {
+    missedGoals.push('meals');
+  }
+
+  if (!(input.workoutsCompleted > 0)) {
+    missedGoals.push('workouts');
+  }
+
+  if (!(input.water >= input.waterGoal)) {
+    missedGoals.push('water');
+  }
+
+  if (input.weighInRequired && !input.hasWeighedInToday) {
+    missedGoals.push('weighIn');
+  }
+
+  if (input.photosRequired && !input.hasCompletedPhotosToday) {
+    missedGoals.push('photos');
+  }
+
+  if (input.isCheatMealDay && !input.hasCompletedCheatMeal) {
+    missedGoals.push('cheatMeal');
+  }
+
+  return {
+    allGoalsReached: missedGoals.length === 0,
+    missedGoals,
+  };
 }
 
 export function DayMetricsProvider({ children }: { children: ReactNode }) {
@@ -141,7 +225,10 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
         if (isCancelled) return;
         if (stored) {
           const parsed = JSON.parse(stored);
-          setHistory(parsed?.history ?? []);
+          const normalizedHistory = (parsed?.history ?? []).map((entry: DayHistoryEntry) =>
+            normalizeHistoryEntry(entry)
+          );
+          setHistory(normalizedHistory);
           if (parsed?.dateKey === todayKey) {
             setStepsToday(parsed.stepsToday ?? 0);
             setWaterLiters(parsed.waterLiters ?? 0);
@@ -213,7 +300,15 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
   const upsertHistoryEntry = (entry: DayHistoryEntry) => {
     setHistory(prev => {
       const filtered = prev.filter(h => h.id !== entry.id);
-      const updated = [...filtered, { ...entry, events: entry.events ?? [] }];
+      const updated = [
+        ...filtered,
+        {
+          ...entry,
+          allGoalsReached: entry.allGoalsReached ?? entry.isDayComplete ?? false,
+          missedGoals: entry.missedGoals ?? [],
+          events: entry.events ?? [],
+        },
+      ];
       return updated.sort((a, b) => b.id.localeCompare(a.id));
     });
   };
@@ -239,6 +334,8 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
           id: todayKey,
           dateISO: timestampISO,
           isDayComplete: false,
+          allGoalsReached: false,
+          missedGoals: [],
           steps: stepsToday,
           stepGoal: 0,
           water: waterLiters,
@@ -290,6 +387,7 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
         addHistoryEventForToday,
         getHistory,
         getHistoryEntryById,
+        evaluateTodayGoals,
       }}
     >
       {children}

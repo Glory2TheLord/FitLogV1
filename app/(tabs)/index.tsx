@@ -38,10 +38,10 @@ export default function HomeScreen() {
     waterLiters,
     setWaterLiters,
     addWater,
-    resetTodayTrackingToDefaults,
     history,
     upsertHistoryEntry,
     addHistoryEventForToday,
+    evaluateTodayGoals,
   } = useDayMetrics();
   
   // Get meal tracking context
@@ -63,7 +63,6 @@ export default function HomeScreen() {
   // Get workouts context
   const {
     getWorkoutsForDate,
-    clearWorkoutsForDate,
     resetTodayWorkoutCompletion,
   } = useWorkouts();
   
@@ -98,8 +97,6 @@ export default function HomeScreen() {
   // ===== DERIVED VALUES FROM MEAL TRACKING & GOALS =====
   // dailyTotals comes from context
   const hasMetStepGoal = stepsToday >= preferences.dailyStepGoal;
-  const hasMetCalorieGoal = dailyTotals.calories > 0 && dailyTotals.calories <= preferences.dailyCalorieGoal;
-  const hasMetProteinGoal = dailyTotals.protein >= preferences.dailyProteinGoal;
   // Calculate days to cheat meal using preference interval and eating streak
   const daysToCheatMeal = Math.max(0, preferences.cheatMealIntervalDays - goodEatingStreak);
   const hasCompletedCheatMealToday = mealSlots.some(slot => {
@@ -116,9 +113,6 @@ export default function HomeScreen() {
     const sorted = [...weighIns].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     return sorted[0].date;
   })();
-  const daysSinceLastWeighIn = lastWeighInDate
-    ? Math.floor((today.getTime() - new Date(lastWeighInDate).getTime()) / (1000 * 60 * 60 * 24))
-    : Infinity;
   const isWeighInRequiredToday = isWeighInRequiredOn(today, preferences.daysUntilWeighInInterval);
   const isWeighInRequiredTomorrow = isWeighInRequiredOn(tomorrowDate, preferences.daysUntilWeighInInterval);
 
@@ -131,9 +125,6 @@ export default function HomeScreen() {
     const sorted = [...photoDays].sort((a, b) => new Date(b.dateKey).getTime() - new Date(a.dateKey).getTime());
     return sorted[0].dateKey;
   })();
-  const daysSinceLastPhotoDay = lastPhotoDate
-    ? Math.floor((today.getTime() - new Date(lastPhotoDate).getTime()) / (1000 * 60 * 60 * 24))
-    : Infinity;
   const isProgressPhotosRequiredToday = isProgressPhotosRequiredOn(today, preferences.daysUntilProgressPhotosInterval);
   const isProgressPhotosRequiredTomorrow = isProgressPhotosRequiredOn(tomorrowDate, preferences.daysUntilProgressPhotosInterval);
 
@@ -148,10 +139,6 @@ export default function HomeScreen() {
     const allSelectedSlotsCompleted = mealSlots.every(slot => slot.completed === true);
     return meetsCalories && meetsProtein && allSelectedSlotsCompleted && !cheatUsedToday;
   })();
-
-  // Stubs for future features
-  const [photosComplete, setPhotosComplete] = useState(false);
-  const [weighInComplete, setWeighInComplete] = useState(false);
 
   // ===== WEEK SUMMARY (placeholders for now) =====
   const [workoutsThisWeek] = useState<number>(3);
@@ -211,24 +198,14 @@ export default function HomeScreen() {
     (today.getTime() - programStartDate.getTime()) / msPerDay
   );
 
-  // ===== "DUE TODAY" LOGIC FOR PHOTOS AND WEIGH-IN =====
-  const photosDueToday = ((daysSinceStart + 1) % 30) === 0;
-  const weighInDueToday = ((daysSinceStart + 1) % 10) === 0;
-
-  // ===== GATE: CAN MARK DAY COMPLETE =====
-  const atLeastOneWorkoutCompleted = getWorkoutsForDate(todayDateKey).some(w => w.isCompleted);
-
-  const meetsWeighInRequirement = !isWeighInRequiredToday || hasWeighedInToday;
-  const meetsPhotoRequirement = !isProgressPhotosRequiredToday || hasCompletedPhotosToday;
-
-  const canMarkDayComplete =
-    stepsComplete &&
-    mealsComplete &&
-    atLeastOneWorkoutCompleted &&
-    meetsWeighInRequirement &&
-    meetsPhotoRequirement &&
-    (!photosDueToday || photosComplete) &&
-    (!weighInDueToday || weighInComplete);
+  const todaysWorkouts = getWorkoutsForDate(todayDateKey);
+  const atLeastOneWorkoutCompleted = todaysWorkouts.some(w => w.isCompleted);
+  const completedWorkouts = todaysWorkouts.filter(w => w.isCompleted).length;
+  const mealsCompletedCount = mealSlots.filter(slot => slot.completed).length;
+  const mealsPlannedCount = mealSlots.filter(slot => slot.templateId !== null).length;
+  const photosTaken = todayPhotoDay ? todayPhotoDay.positions.filter(p => p.imageUri).length : 0;
+  const photosRequired = todayPhotoDay ? todayPhotoDay.positions.length : 5;
+  const isCheatMealDay = daysToCheatMeal === 0;
 
   useEffect(() => {
     let subscription: any;
@@ -349,14 +326,10 @@ export default function HomeScreen() {
   }, [history]);
 
   // ===== LOG DAY AND RECALCULATE GOAL =====
-  const buildHistoryEntryForToday = (): DayHistoryEntry => {
-    const todaysWorkouts = getWorkoutsForDate(todayDateKey);
-    const completedWorkouts = todaysWorkouts.filter(w => w.isCompleted).length;
+  type GoalEvaluation = ReturnType<typeof evaluateTodayGoals>;
+
+  const buildHistoryEntryForToday = (goalEvaluation: GoalEvaluation): DayHistoryEntry => {
     const todaysWeighIn = (profile.weighIns || []).find(w => w.date.slice(0, 10) === todayDateKey);
-    const mealsCompleted = mealSlots.filter(slot => slot.completed).length;
-    const mealsPlanned = mealSlots.filter(slot => slot.templateId !== null).length;
-    const photosTaken = todayPhotoDay ? todayPhotoDay.positions.filter(p => p.imageUri).length : 0;
-    const photosRequired = todayPhotoDay ? todayPhotoDay.positions.length : 5;
 
     const existing = history.find(h => h.id === todayDateKey);
 
@@ -364,6 +337,8 @@ export default function HomeScreen() {
       id: todayDateKey,
       dateISO: new Date().toISOString(),
       isDayComplete: true,
+      allGoalsReached: goalEvaluation.allGoalsReached,
+      missedGoals: goalEvaluation.missedGoals,
       steps: stepsToday,
       stepGoal: preferences.dailyStepGoal,
       water: waterLiters,
@@ -373,8 +348,8 @@ export default function HomeScreen() {
       protein: dailyTotals.protein,
       proteinGoal: preferences.dailyProteinGoal,
       workoutsCompleted: completedWorkouts,
-      mealsCompleted,
-      mealsPlanned,
+      mealsCompleted: mealsCompletedCount,
+      mealsPlanned: mealsPlannedCount,
       didWeighIn: hasWeighedInToday,
       weightLbs: hasWeighedInToday ? todaysWeighIn?.weightLbs : undefined,
       didPhotos: hasCompletedPhotosToday,
@@ -397,16 +372,9 @@ export default function HomeScreen() {
     setWaterLiters(0.0);
     setDailyTotals({ calories: 0, protein: 0 });
     setCheatUsedToday(false);
-    
-    // Reset completion flags
-    setPhotosComplete(false);
-    setWeighInComplete(false);
   };
 
-  // ===== MARK DAY COMPLETE HANDLER =====
-  const handleMarkDayComplete = () => {
-    if (!canMarkDayComplete) return;
-
+  const completeDay = (goalEvaluation: GoalEvaluation) => {
     // 1. Update streak / days-to-cheat logic
     if (hasCompletedCheatMealToday) {
       resetCheatCycle();
@@ -415,13 +383,13 @@ export default function HomeScreen() {
     }
 
     // 2. Log today and recalculate days/weeks to goal
-    const entry = buildHistoryEntryForToday();
+    const entry = buildHistoryEntryForToday(goalEvaluation);
     const updatedHistory = [...history.filter(h => h.id !== entry.id), entry].sort((a, b) => b.id.localeCompare(a.id));
     upsertHistoryEntry(entry);
     recalculateEstimatedDaysToGoal(updatedHistory);
     addHistoryEventForToday({
       type: 'markDayComplete',
-      summary: 'Marked day complete',
+      summary: goalEvaluation.allGoalsReached ? 'Marked day complete' : 'Marked day complete (goals missed)',
       details: {
         steps: stepsToday,
         calories: dailyTotals.calories,
@@ -429,6 +397,9 @@ export default function HomeScreen() {
         water: waterLiters,
         workoutsCompleted: entry.workoutsCompleted,
         mealsCompleted: entry.mealsCompleted,
+        mealsPlanned: entry.mealsPlanned,
+        allGoalsReached: goalEvaluation.allGoalsReached,
+        missedGoals: goalEvaluation.missedGoals,
       },
     });
 
@@ -438,6 +409,52 @@ export default function HomeScreen() {
 
     // 3. Reset all daily state for tomorrow
     resetDailyState();
+  };
+
+  // ===== MARK DAY COMPLETE HANDLER =====
+  const handleMarkDayComplete = () => {
+    const goalEvaluation = evaluateTodayGoals({
+      stepsToday,
+      stepGoal: preferences.dailyStepGoal,
+      calories: dailyTotals.calories,
+      calorieGoal: preferences.dailyCalorieGoal,
+      protein: dailyTotals.protein,
+      proteinGoal: preferences.dailyProteinGoal,
+      water: waterLiters,
+      waterGoal: preferences.dailyWaterGoal,
+      workoutsCompleted: completedWorkouts,
+      mealsCompleted: mealsCompletedCount,
+      mealsPlanned: mealsPlannedCount,
+      weighInRequired: isWeighInRequiredToday,
+      hasWeighedInToday,
+      photosRequired: isProgressPhotosRequiredToday,
+      hasCompletedPhotosToday,
+      isCheatMealDay,
+      hasCompletedCheatMeal: hasCompletedCheatMealToday,
+    });
+
+    const missedList = goalEvaluation.missedGoals.join(', ') || 'some goals';
+
+    if (goalEvaluation.allGoalsReached) {
+      Alert.alert(
+        'Mark today as complete?',
+        'All goals reached. Mark today as complete?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Mark complete', onPress: () => completeDay(goalEvaluation) },
+        ]
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Goals missed',
+      `You didn't reach: ${missedList}. Mark day complete anyway?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Mark anyway', onPress: () => completeDay(goalEvaluation) },
+      ]
+    );
   };
 
   // Handler for settings navigation
@@ -720,11 +737,7 @@ export default function HomeScreen() {
 
             {/* ====== MARK DAY COMPLETE BUTTON ====== */}
             <TouchableOpacity 
-              style={[
-                styles.markDayButton,
-                !canMarkDayComplete && styles.markDayButtonDisabled
-              ]}
-              disabled={!canMarkDayComplete}
+              style={styles.markDayButton}
               onPress={handleMarkDayComplete}
             >
               <Text style={styles.markDayButtonText}>Mark Day Complete</Text>
@@ -775,11 +788,6 @@ export default function HomeScreen() {
                 )}
               </View>
             </TouchableOpacity>
-            {!canMarkDayComplete && (
-              <Text style={styles.markDayHint}>
-                Complete steps, calories, protein, meals, and at least one workout to mark the day complete.
-              </Text>
-            )}
 
             {/* ====== TODAY / TOMORROW FOCUS CARD ====== */}
           <View style={styles.tilesSection}>
