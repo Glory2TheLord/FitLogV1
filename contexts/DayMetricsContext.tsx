@@ -152,46 +152,38 @@ function normalizeHistoryEntry(entry: DayHistoryEntry): DayHistoryEntry {
 export function evaluateTodayGoals(input: EvaluateTodayGoalsInput): EvaluateTodayGoalsResult {
   const missedGoals: string[] = [];
 
-  if (!(input.stepsToday >= input.stepGoal)) {
-    missedGoals.push('steps');
-  }
-
-  if (!(input.calories > 0 && input.calories <= input.calorieGoal)) {
-    missedGoals.push('calories');
-  }
-
-  if (!(input.protein >= input.proteinGoal)) {
-    missedGoals.push('protein');
-  }
-
+  const stepsGoalMet = input.stepsToday >= input.stepGoal;
+  const caloriesGoalMet = input.calories >= input.calorieGoal;
+  const proteinGoalMet = input.protein >= input.proteinGoal;
+  const waterGoalMet = input.water >= input.waterGoal;
   const mealsGoalMet =
     input.mealsPlanned === 0 ? true : input.mealsCompleted >= input.mealsPlanned;
-  if (!mealsGoalMet) {
-    missedGoals.push('meals');
-  }
+  const workoutsGoalMet = input.workoutsCompleted > 0;
+  const weighInGoalMet = !input.weighInRequired || input.hasWeighedInToday;
+  const photosGoalMet = !input.photosRequired || input.hasCompletedPhotosToday;
+  const cheatMealGoalMet = !input.isCheatMealDay || input.hasCompletedCheatMeal;
 
-  if (!(input.workoutsCompleted > 0)) {
-    missedGoals.push('workouts');
-  }
-
-  if (!(input.water >= input.waterGoal)) {
-    missedGoals.push('water');
-  }
-
-  if (input.weighInRequired && !input.hasWeighedInToday) {
-    missedGoals.push('weighIn');
-  }
-
-  if (input.photosRequired && !input.hasCompletedPhotosToday) {
-    missedGoals.push('photos');
-  }
-
-  if (input.isCheatMealDay && !input.hasCompletedCheatMeal) {
-    missedGoals.push('cheatMeal');
-  }
+  if (!stepsGoalMet) missedGoals.push('steps');
+  if (!caloriesGoalMet) missedGoals.push('calories');
+  if (!proteinGoalMet) missedGoals.push('protein');
+  if (!mealsGoalMet) missedGoals.push('meals');
+  if (!workoutsGoalMet) missedGoals.push('workouts');
+  if (!waterGoalMet) missedGoals.push('water');
+  if (!weighInGoalMet) missedGoals.push('weighIn');
+  if (!photosGoalMet) missedGoals.push('photos');
+  if (!cheatMealGoalMet) missedGoals.push('cheatMeal');
 
   return {
-    allGoalsReached: missedGoals.length === 0,
+    allGoalsReached:
+      stepsGoalMet &&
+      caloriesGoalMet &&
+      proteinGoalMet &&
+      waterGoalMet &&
+      mealsGoalMet &&
+      workoutsGoalMet &&
+      weighInGoalMet &&
+      photosGoalMet &&
+      cheatMealGoalMet,
     missedGoals,
   };
 }
