@@ -30,6 +30,8 @@ export type MealSlot = {
 type DailyTotals = {
   calories: number;
   protein: number;
+  carbs: number;
+  fats: number;
 };
 
 type MealTrackingContextType = {
@@ -80,6 +82,8 @@ const DEFAULT_MEAL_SLOTS: MealSlot[] = [
 const DEFAULT_DAILY_TOTALS: DailyTotals = {
   calories: 0,
   protein: 0,
+  carbs: 0,
+  fats: 0,
 };
 
 export function MealTrackingProvider({ children }: { children: ReactNode }) {
@@ -129,7 +133,11 @@ export function MealTrackingProvider({ children }: { children: ReactNode }) {
           completed: !!slot.completed,
         }));
         setMealSlots(normalizedSlots.length > 0 ? normalizedSlots : DEFAULT_MEAL_SLOTS);
-        setDailyTotals(totalsStored ? JSON.parse(totalsStored) : DEFAULT_DAILY_TOTALS);
+        const parsedTotals = totalsStored ? JSON.parse(totalsStored) : DEFAULT_DAILY_TOTALS;
+        setDailyTotals({
+          ...DEFAULT_DAILY_TOTALS,
+          ...parsedTotals,
+        });
         setCheatUsedToday(cheatStored ? JSON.parse(cheatStored) : false);
         setGoodEatingStreak(streakStored ? JSON.parse(streakStored) : 0);
       } catch (error) {
@@ -194,6 +202,8 @@ export function MealTrackingProvider({ children }: { children: ReactNode }) {
   const recalculateDailyTotals = () => {
     let totalCalories = 0;
     let totalProtein = 0;
+    let totalCarbs = 0;
+    let totalFats = 0;
     let hasCheat = false;
     const cheatMeals: MealTemplate[] = [];
 
@@ -203,6 +213,8 @@ export function MealTrackingProvider({ children }: { children: ReactNode }) {
         if (template) {
           totalCalories += template.calories;
           totalProtein += template.protein;
+          totalCarbs += template.carbsGrams ?? 0;
+          totalFats += template.fatGrams ?? 0;
           if (template.category === 'cheat') {
             hasCheat = true;
             cheatMeals.push(template);
@@ -211,14 +223,11 @@ export function MealTrackingProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    setDailyTotals(prev => {
-      const prevCalories = prev.calories;
-      const prevProtein = prev.protein;
-
-      return {
-        calories: totalCalories,
-        protein: totalProtein,
-      };
+    setDailyTotals({
+      calories: totalCalories,
+      protein: totalProtein,
+      carbs: totalCarbs,
+      fats: totalFats,
     });
 
     setCheatUsedToday(hasCheat);

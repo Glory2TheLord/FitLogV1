@@ -102,6 +102,12 @@ export default function HistoryDayDetailScreen() {
           <Text style={styles.rowText}>Water: {entry.water} / {entry.waterGoal} L</Text>
           <Text style={styles.rowText}>Calories: {entry.calories} / {entry.calorieGoal}</Text>
           <Text style={styles.rowText}>Protein: {entry.protein} / {entry.proteinGoal} g</Text>
+          <Text style={styles.rowText}>
+            Carbs: {entry.carbs} g{entry.carbsGoal ? ` / ${entry.carbsGoal} g` : ''}
+          </Text>
+          <Text style={styles.rowText}>
+            Fats: {entry.fats} g{entry.fatsGoal ? ` / ${entry.fatsGoal} g` : ''}
+          </Text>
         </View>
 
         <View style={styles.card}>

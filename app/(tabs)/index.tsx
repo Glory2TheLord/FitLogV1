@@ -341,15 +341,17 @@ export default function HomeScreen() {
       missedGoals: goalEvaluation.missedGoals,
       steps: stepsToday,
       stepGoal: preferences.dailyStepGoal,
-      water: waterLiters,
-      waterGoal: preferences.dailyWaterGoal,
-      calories: dailyTotals.calories,
-      calorieGoal: preferences.dailyCalorieGoal,
-      protein: dailyTotals.protein,
-      proteinGoal: preferences.dailyProteinGoal,
-      workoutsCompleted: completedWorkouts,
-      mealsCompleted: mealsCompletedCount,
-      mealsPlanned: mealsPlannedCount,
+        water: waterLiters,
+        waterGoal: preferences.dailyWaterGoal,
+        calories: dailyTotals.calories,
+        calorieGoal: preferences.dailyCalorieGoal,
+        protein: dailyTotals.protein,
+        proteinGoal: preferences.dailyProteinGoal,
+        carbs: dailyTotals.carbs,
+        fats: dailyTotals.fats,
+        workoutsCompleted: completedWorkouts,
+        mealsCompleted: mealsCompletedCount,
+        mealsPlanned: mealsPlannedCount,
       didWeighIn: hasWeighedInToday,
       weightLbs: hasWeighedInToday ? todaysWeighIn?.weightLbs : undefined,
       didPhotos: hasCompletedPhotosToday,
@@ -370,7 +372,7 @@ export default function HomeScreen() {
     // Reset per-day trackers
     setStepsToday(0);
     setWaterLiters(0.0);
-    setDailyTotals({ calories: 0, protein: 0 });
+    setDailyTotals({ calories: 0, protein: 0, carbs: 0, fats: 0 });
     setCheatUsedToday(false);
   };
 
@@ -390,13 +392,15 @@ export default function HomeScreen() {
     addHistoryEventForToday({
       type: 'markDayComplete',
       summary: goalEvaluation.allGoalsReached ? 'Marked day complete' : 'Marked day complete (goals missed)',
-      details: {
-        steps: stepsToday,
-        calories: dailyTotals.calories,
-        protein: dailyTotals.protein,
-        water: waterLiters,
-        workoutsCompleted: entry.workoutsCompleted,
-        mealsCompleted: entry.mealsCompleted,
+        details: {
+          steps: stepsToday,
+          calories: dailyTotals.calories,
+          protein: dailyTotals.protein,
+          carbs: dailyTotals.carbs,
+          fats: dailyTotals.fats,
+          water: waterLiters,
+          workoutsCompleted: entry.workoutsCompleted,
+          mealsCompleted: entry.mealsCompleted,
         mealsPlanned: entry.mealsPlanned,
         allGoalsReached: goalEvaluation.allGoalsReached,
         missedGoals: goalEvaluation.missedGoals,
@@ -699,6 +703,44 @@ export default function HomeScreen() {
                     </Text>
                   </View>
                   <Text style={styles.trackerLabel}>g</Text>
+                </View>
+
+                {/* Carbs */}
+                <View style={styles.trackerPill}>
+                  <MaterialCommunityIcons
+                    name="bread-slice"
+                    size={20}
+                    style={styles.trackerIcon}
+                  />
+                  <Text
+                    style={styles.trackerNumber}
+                    adjustsFontSizeToFit
+                    numberOfLines={1}
+                    minimumFontScale={0.7}
+                  >
+                    {dailyTotals.carbs}
+                  </Text>
+                  <Text style={styles.trackerLabel}>g carbs</Text>
+                </View>
+              </View>
+
+              <View style={styles.trackersRow}>
+                {/* Fats */}
+                <View style={styles.trackerPill}>
+                  <MaterialCommunityIcons
+                    name="peanut"
+                    size={20}
+                    style={styles.trackerIcon}
+                  />
+                  <Text
+                    style={styles.trackerNumber}
+                    adjustsFontSizeToFit
+                    numberOfLines={1}
+                    minimumFontScale={0.7}
+                  >
+                    {dailyTotals.fats}
+                  </Text>
+                  <Text style={styles.trackerLabel}>g fat</Text>
                 </View>
 
                 {/* Days to cheat meal */}

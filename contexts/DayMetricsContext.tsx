@@ -101,6 +101,11 @@ export type DayHistoryEntry = {
   photosTaken: number;
   photosRequired: number;
 
+  carbs: number;
+  carbsGoal?: number;
+  fats: number;
+  fatsGoal?: number;
+
   cheatInfo?: {
     isCheatDay: boolean;
     daysUntilCheat?: number;
@@ -146,6 +151,8 @@ function normalizeHistoryEntry(entry: DayHistoryEntry): DayHistoryEntry {
     allGoalsReached: entry.allGoalsReached ?? entry.isDayComplete ?? false,
     missedGoals: entry.missedGoals ?? [],
     events: entry.events ?? [],
+    carbs: entry.carbs ?? 0,
+    fats: entry.fats ?? 0,
   };
 }
 
@@ -299,6 +306,8 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
           allGoalsReached: entry.allGoalsReached ?? entry.isDayComplete ?? false,
           missedGoals: entry.missedGoals ?? [],
           events: entry.events ?? [],
+          carbs: entry.carbs ?? 0,
+          fats: entry.fats ?? 0,
         },
       ];
       return updated.sort((a, b) => b.id.localeCompare(a.id));
@@ -336,6 +345,8 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
           calorieGoal: 0,
           protein: 0,
           proteinGoal: 0,
+          carbs: 0,
+          fats: 0,
           workoutsCompleted: 0,
           mealsCompleted: 0,
           mealsPlanned: 0,
