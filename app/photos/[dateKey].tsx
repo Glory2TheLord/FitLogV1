@@ -42,6 +42,7 @@ export default function PhotoDetailScreen() {
   const { photoDays, updatePhotoDay } = usePhotoDays();
   
   const [cameraPermission, requestCameraPermission] = ImagePicker.useCameraPermissions();
+  const [libraryPermission, requestLibraryPermission] = ImagePicker.useMediaLibraryPermissions();
   const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions({
     writeOnly: true,
   });
@@ -98,6 +99,17 @@ export default function PhotoDetailScreen() {
     setViewerUri(null);
   };
 
+  const persistPhotoForPose = (poseKey: PoseKey, photoUri: string) => {
+    setPosePhotos(prev => ({ ...prev, [poseKey]: photoUri }));
+
+    if (photoDay) {
+      const updatedPositions = photoDay.positions.map(pos =>
+        pos.id === poseKey ? { ...pos, imageUri: photoUri } : pos
+      );
+      updatePhotoDay(dateKey!, { ...photoDay, positions: updatedPositions });
+    }
+  };
+
   const handleTakePhoto = async (poseKey: PoseKey) => {
     try {
       if (cameraPermission?.status !== 'granted') {
@@ -146,19 +158,41 @@ export default function PhotoDetailScreen() {
         }
 
         // Update local state
-        setPosePhotos(prev => ({ ...prev, [poseKey]: photoUri }));
-        
-        // Update context to persist
-        if (photoDay) {
-          const updatedPositions = photoDay.positions.map(pos => 
-            pos.id === poseKey ? { ...pos, imageUri: photoUri } : pos
-          );
-          updatePhotoDay(dateKey!, { ...photoDay, positions: updatedPositions });
-        }
+        persistPhotoForPose(poseKey, photoUri);
       }
     } catch (error) {
       console.error('Error taking photo:', error);
       Alert.alert('Error', 'Failed to take photo. Please try again.');
+    }
+  };
+
+  const handleUploadPhoto = async (poseKey: PoseKey) => {
+    try {
+      if (!libraryPermission || libraryPermission.status !== 'granted') {
+        const permissionResult = await requestLibraryPermission();
+        if (!permissionResult.granted) {
+          Alert.alert('Permission needed', 'Photo library permission is required to upload photos.');
+          return;
+        }
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: false,
+        quality: 1,
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const uri = result.assets?.[0]?.uri;
+      if (!uri) return;
+
+      persistPhotoForPose(poseKey, uri);
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      Alert.alert('Error', 'Failed to upload photo. Please try again.');
     }
   };
 
@@ -338,12 +372,20 @@ export default function PhotoDetailScreen() {
                 </TouchableOpacity>
 
                 <View style={styles.photoCardActions}>
-                  <TouchableOpacity
-                    style={styles.photoActionPrimary}
-                    onPress={() => handleTakePhoto(pose.key)}
-                  >
-                    <Text style={styles.photoActionPrimaryText}>Take photo</Text>
-                  </TouchableOpacity>
+                  <View style={styles.photoPrimaryActionsRow}>
+                    <TouchableOpacity
+                      style={styles.photoActionPrimary}
+                      onPress={() => handleTakePhoto(pose.key)}
+                    >
+                      <Text style={styles.photoActionPrimaryText}>Take Photo</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.photoActionUpload}
+                      onPress={() => handleUploadPhoto(pose.key)}
+                    >
+                      <Text style={styles.photoActionUploadText}>Upload Photo</Text>
+                    </TouchableOpacity>
+                  </View>
                   {uri && (
                     <View style={styles.photoCardSecondaryActions}>
                       <TouchableOpacity
@@ -560,15 +602,34 @@ const styles = StyleSheet.create({
   photoCardActions: {
     marginTop: 8,
   },
+  photoPrimaryActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 6,
+  },
   photoActionPrimary: {
+    flex: 1,
     backgroundColor: ACCENT,
     paddingVertical: 6,
     borderRadius: 999,
     alignItems: 'center',
-    marginBottom: 6,
   },
   photoActionPrimaryText: {
     color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  photoActionUpload: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: ACCENT,
+    paddingVertical: 6,
+    borderRadius: 999,
+    alignItems: 'center',
+  },
+  photoActionUploadText: {
+    color: ACCENT,
     fontWeight: '600',
     fontSize: 12,
   },
