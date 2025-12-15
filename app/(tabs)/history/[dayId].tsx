@@ -108,6 +108,12 @@ export default function HistoryDayDetailScreen() {
           <Text style={styles.rowText}>
             Fats: {entry.fats} g{entry.fatsGoal ? ` / ${entry.fatsGoal} g` : ''}
           </Text>
+          <Text style={styles.rowText}>
+            Blood Pressure:{' '}
+            {entry.bloodPressure
+              ? `${entry.bloodPressure.systolic} / ${entry.bloodPressure.diastolic}`
+              : 'not logged'}
+          </Text>
         </View>
 
         <View style={styles.card}>
@@ -343,6 +349,17 @@ function renderTimelineRow(event: any) {
       <>
         <Text style={styles.timelineSummary}>Updated workout template settings.</Text>
         {renderTimelineComment(details)}
+      </>
+    );
+  }
+
+  if ((event.type === 'bloodPressureLogged' || event.type === 'bloodPressureUpdated') && event.details) {
+    const { systolic, diastolic } = event.details as any;
+    const verb = event.type === 'bloodPressureUpdated' ? 'updated' : 'logged';
+    const valueText = systolic && diastolic ? `${systolic} / ${diastolic}` : '';
+    return (
+      <>
+        <Text style={styles.timelineSummary}>Blood pressure {verb} — {valueText}</Text>
       </>
     );
   }

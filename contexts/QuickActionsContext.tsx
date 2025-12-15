@@ -1,5 +1,5 @@
-import React, { createContext, ReactNode, useContext, useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useDayMetrics } from './DayMetricsContext';
 import { usePreferences } from './PreferencesContext';
 import { useUserProfile } from './UserProfileContext';
@@ -14,7 +14,16 @@ const QuickActionsContext = createContext<QuickActionsContextValue | undefined>(
 const ACCENT = '#f97316';
 
 export function QuickActionsProvider({ children }: { children: ReactNode }) {
-  const { addSteps, stepsToday, addWater, waterLiters, addHistoryEventForToday, setStepsToday } = useDayMetrics();
+  const {
+    addSteps,
+    stepsToday,
+    addWater,
+    waterLiters,
+    addHistoryEventForToday,
+    setStepsToday,
+    setTodayBloodPressure,
+    todayBloodPressure,
+  } = useDayMetrics();
   const { preferences } = usePreferences();
   const { recordWeighIn } = useUserProfile();
 
@@ -23,22 +32,28 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
   const [waterDialogVisible, setWaterDialogVisible] = useState(false);
   const [weighDialogVisible, setWeighDialogVisible] = useState(false);
   const [noteDialogVisible, setNoteDialogVisible] = useState(false);
+  const [bloodPressureDialogVisible, setBloodPressureDialogVisible] = useState(false);
 
   const [stepInput, setStepInput] = useState('');
   const [waterInput, setWaterInput] = useState('');
   const [weighInput, setWeighInput] = useState('');
   const [noteInput, setNoteInput] = useState('');
+  const [systolicInput, setSystolicInput] = useState('');
+  const [diastolicInput, setDiastolicInput] = useState('');
 
   const closeAllDialogs = () => {
     setQuickAddVisible(false);
     setStepsDialogVisible(false);
     setWaterDialogVisible(false);
     setWeighDialogVisible(false);
+    setBloodPressureDialogVisible(false);
     setNoteDialogVisible(false);
     setStepInput('');
     setWaterInput('');
     setWeighInput('');
     setNoteInput('');
+    setSystolicInput('');
+    setDiastolicInput('');
     setStepMode('fitbit');
   };
 
@@ -176,6 +191,28 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
     closeAllDialogs();
   };
 
+  const handleAddBloodPressureConfirm = () => {
+    const systolic = Number(systolicInput);
+    const diastolic = Number(diastolicInput);
+    if (!Number.isFinite(systolic) || !Number.isFinite(diastolic) || systolic <= 0 || diastolic <= 0) {
+      Alert.alert('Invalid values', 'Please enter valid numbers for both systolic and diastolic.');
+      return;
+    }
+    setTodayBloodPressure({
+      systolic,
+      diastolic,
+      timestamp: new Date().toISOString(),
+    });
+    closeAllDialogs();
+  };
+
+  useEffect(() => {
+    if (bloodPressureDialogVisible) {
+      setSystolicInput(todayBloodPressure ? String(todayBloodPressure.systolic) : '');
+      setDiastolicInput(todayBloodPressure ? String(todayBloodPressure.diastolic) : '');
+    }
+  }, [bloodPressureDialogVisible, todayBloodPressure]);
+
   const openQuickActions = () => {
     setQuickAddVisible(true);
   };
@@ -223,6 +260,15 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
               style={styles.quickAddButton}
               onPress={() => {
                 setQuickAddVisible(false);
+                setBloodPressureDialogVisible(true);
+              }}
+            >
+              <Text style={styles.quickAddButtonText}>Log blood pressure</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quickAddButton}
+              onPress={() => {
+                setQuickAddVisible(false);
                 setNoteDialogVisible(true);
               }}
             >
@@ -234,8 +280,40 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
             >
               <Text style={styles.quickAddCancelText}>Close</Text>
             </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  )}
+
+      {bloodPressureDialogVisible && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Log blood pressure</Text>
+            <TextInput
+              style={styles.modalInput}
+              keyboardType="numeric"
+              placeholder="Systolic (top number)"
+              placeholderTextColor="#9ca3af"
+              value={systolicInput}
+              onChangeText={setSystolicInput}
+            />
+            <TextInput
+              style={[styles.modalInput, { marginTop: 10 }]}
+              keyboardType="numeric"
+              placeholder="Diastolic (bottom number)"
+              placeholderTextColor="#9ca3af"
+              value={diastolicInput}
+              onChangeText={setDiastolicInput}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.modalButtonSecondary} onPress={closeAllDialogs}>
+                <Text style={styles.modalButtonSecondaryText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalButtonPrimary} onPress={handleAddBloodPressureConfirm}>
+                <Text style={styles.modalButtonPrimaryText}>Save</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </TouchableOpacity>
+        </View>
       )}
 
       {stepsDialogVisible && (

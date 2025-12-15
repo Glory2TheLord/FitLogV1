@@ -1,4 +1,4 @@
-import { getUserScopedKey } from '@/storage/userScopedKey';
+﻿import { getUserScopedKey } from '@/storage/userScopedKey';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { useUser } from './UserContext';
@@ -39,6 +39,8 @@ export type DayHistoryEventType =
   | 'stepsUpdatedFromFitbit'
   | 'calorieGoalReached'
   | 'proteinGoalReached'
+  | 'bloodPressureLogged'
+  | 'bloodPressureUpdated'
   | 'goalWeightReached'
   | 'mealCompleted'
   | 'mealsAllCompleted'
@@ -67,8 +69,15 @@ export type DayHistoryEvent = {
 // - photosSlotCompleted/photosAllCompleted: { slot?, photosTaken?, required? }
 // - stepsLogged/stepGoalReached: { previous?, current?, delta?, stepGoal?, source? }
 // - waterLogged: { previous?, current?, delta?, waterGoal? }
+// - bloodPressureLogged: { systolic?, diastolic? }
 // - cheatMealLogged: { description?, caloriesEstimate?, notes? }
 // - weighIn/goalWeightReached: { previousWeightLbs?, weightLbs?, goalWeightLbs?, weeksUntilGoalBefore?, weeksUntilGoalAfter? }
+
+export type DailyBloodPressure = {
+  systolic: number;
+  diastolic: number;
+  timestamp: string;
+};
 
 export type DayHistoryEntry = {
   id: string; // date key, e.g. "2025-12-08"
@@ -106,6 +115,8 @@ export type DayHistoryEntry = {
   fats: number;
   fatsGoal?: number;
 
+  bloodPressure?: DailyBloodPressure | null;
+
   cheatInfo?: {
     isCheatDay: boolean;
     daysUntilCheat?: number;
@@ -119,10 +130,13 @@ export type DayHistoryEntry = {
 type DayMetricsContextValue = {
   stepsToday: number;
   waterLiters: number;
+  todayBloodPressure: DailyBloodPressure | null;
   addSteps: (amount: number) => void;
   addWater: (amount: number) => void;
   setStepsToday: React.Dispatch<React.SetStateAction<number>>;
   setWaterLiters: React.Dispatch<React.SetStateAction<number>>;
+  setTodayBloodPressure: (bp: DailyBloodPressure | null) => void;
+  getTodayBloodPressure: () => DailyBloodPressure | null;
   resetTodayTrackingToDefaults: () => void;
   history: DayHistoryEntry[];
   upsertHistoryEntry: (entry: DayHistoryEntry) => void;
@@ -153,6 +167,7 @@ function normalizeHistoryEntry(entry: DayHistoryEntry): DayHistoryEntry {
     events: entry.events ?? [],
     carbs: entry.carbs ?? 0,
     fats: entry.fats ?? 0,
+    bloodPressure: entry.bloodPressure ?? null,
   };
 }
 
@@ -203,6 +218,7 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
 
   const [stepsToday, setStepsToday] = useState(0);
   const [waterLiters, setWaterLiters] = useState(0);
+  const [todayBloodPressure, setTodayBloodPressureState] = useState<DailyBloodPressure | null>(null);
   const [history, setHistory] = useState<DayHistoryEntry[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -231,19 +247,23 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
           if (parsed?.dateKey === todayKey) {
             setStepsToday(parsed.stepsToday ?? 0);
             setWaterLiters(parsed.waterLiters ?? 0);
+            setTodayBloodPressureState(parsed.bloodPressure ?? null);
           } else {
             setStepsToday(0);
             setWaterLiters(0);
+            setTodayBloodPressureState(null);
           }
         } else {
           setStepsToday(0);
           setWaterLiters(0);
+          setTodayBloodPressureState(null);
           setHistory([]);
         }
       } catch (error) {
         console.error('Error loading day metrics', error);
         setStepsToday(0);
         setWaterLiters(0);
+        setTodayBloodPressureState(null);
         setHistory([]);
       } finally {
         if (!isCancelled) {
@@ -271,6 +291,7 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
             dateKey: todayKey,
             stepsToday,
             waterLiters,
+            bloodPressure: todayBloodPressure,
             history,
           })
         );
@@ -279,7 +300,7 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
       }
     };
     saveData();
-  }, [stepsToday, waterLiters, history, isLoaded, userId, todayKey]);
+  }, [stepsToday, waterLiters, todayBloodPressure, history, isLoaded, userId, todayKey]);
 
   const addSteps = (amount: number) => {
     if (!Number.isFinite(amount) || amount <= 0) return;
@@ -294,6 +315,7 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
   const resetTodayTrackingToDefaults = () => {
     setStepsToday(0);
     setWaterLiters(0);
+    setTodayBloodPressureState(null);
   };
 
   const upsertHistoryEntry = (entry: DayHistoryEntry) => {
@@ -308,6 +330,7 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
           events: entry.events ?? [],
           carbs: entry.carbs ?? 0,
           fats: entry.fats ?? 0,
+          bloodPressure: entry.bloodPressure ?? null,
         },
       ];
       return updated.sort((a, b) => b.id.localeCompare(a.id));
@@ -317,6 +340,31 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
   const deleteHistoryEntry = (id: string) => {
     setHistory(prev => prev.filter(h => h.id !== id));
   };
+
+  const setTodayBloodPressure = (bp: DailyBloodPressure | null) => {
+    const withTimestamp =
+      bp && !bp.timestamp
+        ? { ...bp, timestamp: new Date().toISOString() }
+        : bp;
+    const hadExisting = !!todayBloodPressure;
+    setTodayBloodPressureState(withTimestamp ?? null);
+    const todayKey = getTodayKey();
+    setHistory(prev => {
+      const updated = prev.map(entry =>
+        entry.id === todayKey ? { ...entry, bloodPressure: withTimestamp ?? null } : entry
+      );
+      return updated;
+    });
+    if (withTimestamp) {
+      addHistoryEventForToday({
+        type: hadExisting ? 'bloodPressureUpdated' : 'bloodPressureLogged',
+        summary: `Blood pressure ${hadExisting ? 'updated' : 'logged'} — ${withTimestamp.systolic} / ${withTimestamp.diastolic}`,
+        details: { systolic: withTimestamp.systolic, diastolic: withTimestamp.diastolic },
+      });
+    }
+  };
+
+  const getTodayBloodPressure = () => todayBloodPressure;
 
   const addHistoryEventForToday = (event: Omit<DayHistoryEvent, 'id' | 'timestampISO'>) => {
     const todayKey = getTodayKey();
@@ -347,6 +395,7 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
           proteinGoal: 0,
           carbs: 0,
           fats: 0,
+          bloodPressure: todayBloodPressure ?? null,
           workoutsCompleted: 0,
           mealsCompleted: 0,
           mealsPlanned: 0,
@@ -362,6 +411,7 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
 
       const updatedEntry: DayHistoryEntry = {
         ...baseEntry,
+        bloodPressure: todayBloodPressure ?? baseEntry.bloodPressure ?? null,
         events: [...(baseEntry.events || []), newEvent],
       };
 
@@ -379,10 +429,13 @@ export function DayMetricsProvider({ children }: { children: ReactNode }) {
       value={{
         stepsToday,
         waterLiters,
+        todayBloodPressure,
         addSteps,
         addWater,
         setStepsToday,
         setWaterLiters,
+        setTodayBloodPressure,
+        getTodayBloodPressure,
         resetTodayTrackingToDefaults,
         history,
         upsertHistoryEntry,

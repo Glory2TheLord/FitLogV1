@@ -42,6 +42,8 @@ export default function HomeScreen() {
     upsertHistoryEntry,
     addHistoryEventForToday,
     evaluateTodayGoals,
+    todayBloodPressure,
+    setTodayBloodPressure,
   } = useDayMetrics();
   
   // Get meal tracking context
@@ -271,6 +273,10 @@ export default function HomeScreen() {
 
   const formattedStepsWeek = stepsThisWeek.toLocaleString('en-US');
 
+  const bloodPressureDisplay = todayBloodPressure
+    ? `${todayBloodPressure.systolic} / ${todayBloodPressure.diastolic}`
+    : '-- / --';
+
   // Dev-only reset handler
   // ===== GOAL ESTIMATION HELPER =====
   const recalculateEstimatedDaysToGoal = (entries: DayHistoryEntry[]) => {
@@ -343,15 +349,16 @@ export default function HomeScreen() {
       stepGoal: preferences.dailyStepGoal,
         water: waterLiters,
         waterGoal: preferences.dailyWaterGoal,
-        calories: dailyTotals.calories,
-        calorieGoal: preferences.dailyCalorieGoal,
-        protein: dailyTotals.protein,
-        proteinGoal: preferences.dailyProteinGoal,
-        carbs: dailyTotals.carbs,
-        fats: dailyTotals.fats,
-        workoutsCompleted: completedWorkouts,
-        mealsCompleted: mealsCompletedCount,
-        mealsPlanned: mealsPlannedCount,
+      calories: dailyTotals.calories,
+      calorieGoal: preferences.dailyCalorieGoal,
+      protein: dailyTotals.protein,
+      proteinGoal: preferences.dailyProteinGoal,
+      carbs: dailyTotals.carbs,
+      fats: dailyTotals.fats,
+      bloodPressure: todayBloodPressure ?? undefined,
+      workoutsCompleted: completedWorkouts,
+      mealsCompleted: mealsCompletedCount,
+      mealsPlanned: mealsPlannedCount,
       didWeighIn: hasWeighedInToday,
       weightLbs: hasWeighedInToday ? todaysWeighIn?.weightLbs : undefined,
       didPhotos: hasCompletedPhotosToday,
@@ -374,6 +381,7 @@ export default function HomeScreen() {
     setWaterLiters(0.0);
     setDailyTotals({ calories: 0, protein: 0, carbs: 0, fats: 0 });
     setCheatUsedToday(false);
+    setTodayBloodPressure(null);
   };
 
   const completeDay = (goalEvaluation: GoalEvaluation) => {
@@ -476,20 +484,33 @@ export default function HomeScreen() {
   const [quickAddVisible, setQuickAddVisible] = useState(false);
   const [stepsDialogVisible, setStepsDialogVisible] = useState(false);
   const [waterDialogVisible, setWaterDialogVisible] = useState(false);
+  const [bloodPressureDialogVisible, setBloodPressureDialogVisible] = useState(false);
   const [stepInput, setStepInput] = useState('');
   const [waterInput, setWaterInput] = useState('');
+  const [systolicInput, setSystolicInput] = useState('');
+  const [diastolicInput, setDiastolicInput] = useState('');
   const [weighDialogVisible, setWeighDialogVisible] = useState(false);
   const [weighInput, setWeighInput] = useState('');
   const [noteDialogVisible, setNoteDialogVisible] = useState(false);
   const [noteInput, setNoteInput] = useState('');
 
+  useEffect(() => {
+    if (bloodPressureDialogVisible) {
+      setSystolicInput(todayBloodPressure ? String(todayBloodPressure.systolic) : '');
+      setDiastolicInput(todayBloodPressure ? String(todayBloodPressure.diastolic) : '');
+    }
+  }, [bloodPressureDialogVisible, todayBloodPressure]);
+
   const closeAllDialogs = () => {
     setQuickAddVisible(false);
     setStepsDialogVisible(false);
     setWaterDialogVisible(false);
+    setBloodPressureDialogVisible(false);
     setWeighDialogVisible(false);
     setStepInput('');
     setWaterInput('');
+    setSystolicInput('');
+    setDiastolicInput('');
     setWeighInput('');
     setNoteDialogVisible(false);
     setNoteInput('');
@@ -554,6 +575,19 @@ export default function HomeScreen() {
         },
       });
     }
+    closeAllDialogs();
+  };
+
+  const handleAddBloodPressureConfirm = () => {
+    const systolic = Number(systolicInput);
+    const diastolic = Number(diastolicInput);
+    if (!Number.isFinite(systolic) || !Number.isFinite(diastolic) || systolic <= 0 || diastolic <= 0) {
+      Alert.alert('Invalid values', 'Please enter valid numbers for both systolic and diastolic.');
+      return;
+    }
+
+    const timestamp = new Date().toISOString();
+    setTodayBloodPressure({ systolic, diastolic, timestamp });
     closeAllDialogs();
   };
 
@@ -741,6 +775,23 @@ export default function HomeScreen() {
                     {dailyTotals.fats}
                   </Text>
                   <Text style={styles.trackerLabel}>g fat</Text>
+                </View>
+
+                {/* Blood Pressure */}
+                <View style={styles.trackerPill}>
+                  <MaterialCommunityIcons
+                    name="heart-pulse"
+                    size={20}
+                    style={styles.trackerIcon}
+                  />
+                  <Text
+                    style={styles.trackerNumber}
+                    adjustsFontSizeToFit
+                    numberOfLines={1}
+                    minimumFontScale={0.7}
+                  >
+                    {bloodPressureDisplay}
+                  </Text>
                 </View>
 
                 {/* Days to cheat meal */}
@@ -964,6 +1015,17 @@ export default function HomeScreen() {
               style={styles.quickAddButton}
               onPress={() => {
                 setQuickAddVisible(false);
+                setSystolicInput(todayBloodPressure ? String(todayBloodPressure.systolic) : '');
+                setDiastolicInput(todayBloodPressure ? String(todayBloodPressure.diastolic) : '');
+                setBloodPressureDialogVisible(true);
+              }}
+            >
+              <Text style={styles.quickAddButtonText}>Log blood pressure</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quickAddButton}
+              onPress={() => {
+                setQuickAddVisible(false);
                 setNoteDialogVisible(true);
               }}
             >
@@ -1023,6 +1085,39 @@ export default function HomeScreen() {
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalButtonPrimary} onPress={handleAddWaterConfirm}>
                 <Text style={styles.modalButtonPrimaryText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Blood Pressure Dialog */}
+      {bloodPressureDialogVisible && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Log blood pressure</Text>
+            <TextInput
+              style={styles.modalInput}
+              keyboardType="numeric"
+              placeholder="Systolic (top number)"
+              placeholderTextColor="#9ca3af"
+              value={systolicInput}
+              onChangeText={setSystolicInput}
+            />
+            <TextInput
+              style={[styles.modalInput, { marginTop: 10 }]}
+              keyboardType="numeric"
+              placeholder="Diastolic (bottom number)"
+              placeholderTextColor="#9ca3af"
+              value={diastolicInput}
+              onChangeText={setDiastolicInput}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.modalButtonSecondary} onPress={closeAllDialogs}>
+                <Text style={styles.modalButtonSecondaryText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalButtonPrimary} onPress={handleAddBloodPressureConfirm}>
+                <Text style={styles.modalButtonPrimaryText}>Save</Text>
               </TouchableOpacity>
             </View>
           </View>
